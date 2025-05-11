@@ -7,3 +7,13 @@ requires-python = ">=3.8"
 dependencies = [
     "python-rocksdb==0.9.0"
 ]
+
+[tool.setuptools]
+# By setting package_dir, we tell setuptools that the 'kvwc' package's source files
+# (like __init__.py, wide_column_db.py) are in the current directory (project root for kvwc).
+package_dir = {"kvwc" = "."}
+# This explicitly lists the 'kvwc' package to be included.
+# setuptools will then look for 'kvwc/__init__.py' based on the package_dir mapping.
+# Since we mapped 'kvwc' to '.', it will look for './__init__.py' and './wide_column_db.py'
+# to be part of the 'kvwc' package.
+packages = ["kvwc"]
