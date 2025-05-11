@@ -1,1 +1,1 @@
-from wide_column_db import *
+from .wide_column_db import *

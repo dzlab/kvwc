@@ -4,14 +4,23 @@ import shutil
 import os
 import sys
 
-# Add the project root to sys.path to allow direct import of rswc.wide_column_db
-# This assumes the test script is run from the 'vibecoding' directory or 'vibecoding' is in PYTHONPATH
-# For robustness, especially when tests are discovered by a test runner,
-# it's better to ensure the module can be found.
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__)) # vibecoding/rswc/
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR) # vibecoding/
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+# Add the directory containing the 'kvwc' package (vibecoding/kvwc) to sys.path.
+# This allows 'from kvwc import ...' to find the actual package at vibecoding/kvwc/kvwc.
+# This is useful when running tests directly or with a test runner that might not
+# automatically have vibecoding/kvwc in sys.path.
+#
+# Structure:
+# vibecoding/kvwc/pyproject.toml
+# vibecoding/kvwc/kvwc/... (package code)
+# vibecoding/kvwc/tests/test_wide_column_db.py (this file)
+#
+# __file__ is .../vibecoding/kvwc/tests/test_wide_column_db.py
+# SCRIPT_DIR is .../vibecoding/kvwc/tests
+# PACKAGE_CONTAINING_DIR is .../vibecoding/kvwc
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PACKAGE_CONTAINING_DIR = os.path.dirname(SCRIPT_DIR) # This should be vibecoding/kvwc
+if PACKAGE_CONTAINING_DIR not in sys.path:
+    sys.path.insert(0, PACKAGE_CONTAINING_DIR)
 
 from kvwc import WideColumnDB, MAX_UINT64, KEY_SEPARATOR
 
