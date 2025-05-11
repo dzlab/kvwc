@@ -4,23 +4,30 @@ import shutil
 import os
 import sys
 
-# Add the directory containing the 'kvwc' package (vibecoding/kvwc) to sys.path.
-# This allows 'from kvwc import ...' to find the actual package at vibecoding/kvwc/kvwc.
-# This is useful when running tests directly or with a test runner that might not
-# automatically have vibecoding/kvwc in sys.path.
+# Ensure the 'vibecoding' directory (which contains the 'kvwc' package) is in sys.path.
+# This allows 'from kvwc import ...' to work correctly when running this test script directly.
+# Python will look for 'kvwc' inside the directories listed in sys.path.
 #
-# Structure:
-# vibecoding/kvwc/pyproject.toml
-# vibecoding/kvwc/kvwc/... (package code)
-# vibecoding/kvwc/tests/test_wide_column_db.py (this file)
+# Project Structure relevant to this path modification:
+# vibecoding/            (This directory needs to be in sys.path)
+# ├── kvwc/              (This is the 'kvwc' package)
+# │   ├── __init__.py
+# │   └── wide_column_db.py
+# │   └── pyproject.toml (Defines 'kvwc' as the project, located in this dir)
+# └── kvwc/tests/        (The directory containing this test script)
+#     └── test_wide_column_db.py
 #
+# Path calculation:
 # __file__ is .../vibecoding/kvwc/tests/test_wide_column_db.py
-# SCRIPT_DIR is .../vibecoding/kvwc/tests
-# PACKAGE_CONTAINING_DIR is .../vibecoding/kvwc
+# SCRIPT_DIR is .../vibecoding/kvwc/tests/
+# KVWC_DIR (directory of the 'kvwc' package) is .../vibecoding/kvwc/
+# PROJECT_ROOT_DIR (directory containing the 'kvwc' package) is .../vibecoding/
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PACKAGE_CONTAINING_DIR = os.path.dirname(SCRIPT_DIR) # This should be vibecoding/kvwc
-if PACKAGE_CONTAINING_DIR not in sys.path:
-    sys.path.insert(0, PACKAGE_CONTAINING_DIR)
+KVWC_DIR = os.path.dirname(SCRIPT_DIR) # This is vibecoding/kvwc
+PROJECT_ROOT_DIR = os.path.dirname(KVWC_DIR) # This is vibecoding/
+
+if PROJECT_ROOT_DIR not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT_DIR)
 
 from kvwc import WideColumnDB, MAX_UINT64, KEY_SEPARATOR
 
