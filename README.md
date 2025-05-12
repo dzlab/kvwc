@@ -1,4 +1,4 @@
-# Key-Value Wide Column (KVWC)
+# Key-Value Wide Column (KVWC) Database
 
 KVWC is a Python library that implements a key-value wide-column data store, leveraging RocksDB as its underlying storage engine. It allows you to store and retrieve data organized by row keys, column names, and timestamps, providing versioning capabilities for your data.
 
