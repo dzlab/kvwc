@@ -1,0 +1,46 @@
+name: KVWC Tests
+
+on:
+  push:
+    paths:
+      - "vibecoding/kvwc/**"
+      - ".github/workflows/kvwc-tests.yml"
+  pull_request:
+    paths:
+      - "vibecoding/kvwc/**"
+      - ".github/workflows/kvwc-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./vibecoding/kvwc
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Checkout the code into the GITHUB_WORKSPACE/vibecoding directory
+          # to match the local structure and simplify paths.
+          path: vibecoding
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "vibecoding/kvwc/.python-version" # Path to your .python-version file
+
+      - name: Install RocksDB system library
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librocksdb-dev build-essential
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel cython
+          # If your WideColumnDB project had a requirements.txt, you might use:
+          # pip install -r requirements.txt
+          # To install the project itself (kvwc) and its dependencies from pyproject.toml:
+          pip install .
+
+      - name: Run tests
+        run: |
+          python -m unittest discover tests
