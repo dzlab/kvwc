@@ -3,30 +3,30 @@ name: KVWC Tests
 on:
   push:
     paths:
-      - "vibecoding/kvwc/**"
-      - ".github/workflows/kvwc-tests.yml"
+      - "kvwc/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     paths:
-      - "vibecoding/kvwc/**"
-      - ".github/workflows/kvwc-tests.yml"
+      - "kvwc/**"
+      - ".github/workflows/ci.yml"
 
 jobs:
   test:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./vibecoding/kvwc
+        working-directory: ./kvwc
     steps:
       - uses: actions/checkout@v4
         with:
-          # Checkout the code into the GITHUB_WORKSPACE/vibecoding directory
+          # Checkout the code into the GITHUB_WORKSPACE/kvwc directory
           # to match the local structure and simplify paths.
-          path: vibecoding
+          path: kvwc
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version-file: "vibecoding/kvwc/.python-version" # Path to your .python-version file
+          python-version-file: "kvwc/.python-version" # Path to your .python-version file
 
       - name: Install RocksDB system library
         run: |
