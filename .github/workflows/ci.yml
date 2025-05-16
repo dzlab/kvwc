@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version-file: "kvwc/.python-version" # Path to your .python-version file
+          python-version-file: "kvwc/.python-version"
 
       - name: Install RocksDB system library
         run: |

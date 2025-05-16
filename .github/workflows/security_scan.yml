@@ -1,0 +1,38 @@
+name: Python Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "kvwc/.python-version"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install bandit
+          pip install safety
+
+      - name: Run security scan with bandit
+        run: |
+          bandit -r .
+
+      - name: Run safety check
+        run: |
+          safety check
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        env:
+          SEMGREP_RULES: p/default # or another ruleset
