@@ -1,4 +1,4 @@
-name: KVWC Tests
+name: CI
 
 on:
   push:
