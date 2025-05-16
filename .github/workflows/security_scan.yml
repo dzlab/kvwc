@@ -35,7 +35,7 @@ jobs:
 
       - name: Run safety check
         run: |
-          safety check
+          safety scan
 
       - name: Run Semgrep
         uses: returntocorp/semgrep-action@v1
