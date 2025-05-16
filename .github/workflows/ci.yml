@@ -1,14 +1,6 @@
 name: KVWC Tests
 
-on:
-  push:
-    paths:
-      - "kvwc/**"
-      - ".github/workflows/ci.yml"
-  pull_request:
-    paths:
-      - "kvwc/**"
-      - ".github/workflows/ci.yml"
+on: [push, pull_request]
 
 jobs:
   test:
