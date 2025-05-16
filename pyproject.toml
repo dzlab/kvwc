@@ -3,7 +3,7 @@ name = "kvwc"
 version = "0.1.0"
 description = "A key-value wide-column data store using RocksDB, supporting versioning and datasets."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "Apache License 2.0" }
 authors = [{ name = "dzlab", email = "dzlabs@outlook.com" }]
 keywords = [

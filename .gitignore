@@ -1,0 +1,42 @@
+# Byte-compiled Python files
+*.py[cod]
+
+# Log files
+*.log
+
+# UV environment
+.uv
+.venv
+venv
+ENV
+
+# Python package build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.vscode/
+*.idea/
+
+# OS files
+.DS_Store  # macOS
+Thumbs.db  # Windows
+
+# Test coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# pytest debug files
+.pytest_cache/
+
+# mypy cache
+.mypy_cache/
+
+# Other
+*.bak
+*.tmp
+

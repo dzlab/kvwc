@@ -41,13 +41,12 @@ The project uses `pyproject.toml` for its build and dependency management.
 
 1.  **Clone the repository (if you're working from a git clone):**
     ```bash
-    git clone <your-repo-url>
-    cd <your-repo-directory> # Navigate to the directory containing pyproject.toml for kvwc
+    git clone git@github.com:dzlab/kvwc.git
+    cd kvwc
     ```
-    If `kvwc` is part of a larger project structure like `vibecoding/kvwc`, navigate to the `vibecoding/kvwc` directory.
 
 2.  **Install:**
-    You can install the package and its dependencies (like `python-rocksdb`) using pip from the directory containing `pyproject.toml` (e.g., `vibecoding/kvwc`):
+    You can install the package and its dependencies (like `rocksdb`) using pip from the directory containing `pyproject.toml` (e.g., `kvwc`):
     ```bash
     pip install .
     ```
@@ -206,17 +205,17 @@ This structure is an internal detail, but understanding it can be helpful for ad
 
 ## Running Tests
 
-The project includes a suite of unit tests in `vibecoding/kvwc/tests/test_wide_column_db.py`. To run the tests:
+The project includes a suite of unit tests in `kvwc/tests/test_wide_column_db.py`. To run the tests:
 
-1.  Ensure you have installed the `kvwc` package and its dependencies (as described in the Installation section), or that the `vibecoding` directory (the one containing the `kvwc` package) is in your `PYTHONPATH`.
-2.  Navigate to the root directory of the project (e.g., the directory containing `vibecoding`).
+1.  Ensure you have installed the `kvwc` package and its dependencies (as described in the Installation section).
+2.  Navigate to the root directory of the project.
 3.  Run the tests using Python's `unittest` module:
 
     ```bash
-    python -m unittest vibecoding.kvwc.tests.test_wide_column_db
+    python -m unittest kvwc.tests.test_wide_column_db
     ```
     Alternatively, if your current working directory is the project root:
     ```bash
-    python vibecoding/kvwc/tests/test_wide_column_db.py
+    python kvwc/tests/test_wide_column_db.py
     ```
     The tests create and remove temporary database files in a `test_db_temp_wide_column_main` directory in the location where the test script is run.

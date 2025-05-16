@@ -1,4 +1,4 @@
-import rocksdb
+import rocksdbpy as rocksdb
 import struct
 import time
 
@@ -9,11 +9,11 @@ MAX_UINT64 = 2**64 - 1
 
 class WideColumnDB:
     def __init__(self, db_path):
-        opts = rocksdb.Options()
-        opts.create_if_missing = True
+        opts = rocksdb.Option()
+        opts.create_if_missing(True)
         # For more advanced usage, you might explore Column Families here
         # to represent different datasets/tables within the same DB.
-        self.db = rocksdb.DB(db_path, opts)
+        self.db = rocksdb.open(db_path, opts)
 
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
@@ -115,7 +115,7 @@ class WideColumnDB:
             scan_prefixes.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
 
         for prefix_bytes in scan_prefixes:
-            it = self.db.itervalues() # Iterate over values
+            it = self.db.iterator() # Iterate over values
             it.seek(prefix_bytes) # Seek to the start of the prefix
 
             # Need to iterate keys as well to decode them

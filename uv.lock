@@ -1,0 +1,34 @@
+version = 1
+revision = 2
+requires-python = ">=3.9"
+
+[[package]]
+name = "kvwc"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "rocksdb-py" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "rocksdb-py" }]
+
+[[package]]
+name = "rocksdb-py"
+version = "0.0.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/98/9806f3aa7fc64be2ef1edecc9d9f3e874294b9f06dc7f4e9b6c5723c4b1c/rocksdb_py-0.0.5.tar.gz", hash = "sha256:9ccc51a6e4350d766381bf996a5231331807988ea18a2062c28c4537dbf47fec", size = 54103, upload-time = "2023-10-10T22:16:02.994Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/49/15/dc775b1fee8041ad12f6d481ff0a56d6b04e9a5bc6bd4f56eb3cebf47d2a/rocksdb_py-0.0.5-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:7015b010bc43a84ae0d76dab402ed770c7bf8f302db7ac1ce511f0f79874f376", size = 3196528, upload-time = "2023-10-10T22:15:06.99Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/57/56189314c592f9bf649a4a35065682a95482218159e499b0a2769fbe2fd5/rocksdb_py-0.0.5-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:55ec77a0c548eeb9a9418081e328a2ea82f82b7679eb36bbfa0eeefc2aa5ef07", size = 2875144, upload-time = "2023-10-10T22:15:11.388Z" },
+    { url = "https://files.pythonhosted.org/packages/68/83/b7ae81b5c58fd5a775cc2e8a671578f31f8a8077afd36ea4d66c36c69150/rocksdb_py-0.0.5-cp310-cp310-manylinux_2_31_x86_64.whl", hash = "sha256:3d05a80e5bac8e6b1c54f3eac9b4fbf15767557eb963676fc4a6888ac3259743", size = 4686029, upload-time = "2023-10-10T22:15:17.859Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/b4/32187c5fb228baf1f19766f3bb812293e22d657a299560f1d0c1cdd43395/rocksdb_py-0.0.5-cp310-none-win_amd64.whl", hash = "sha256:1b843d5302836a148f39065badf75786e1db470a485c2667c2e7d0904614e371", size = 2359450, upload-time = "2023-10-10T22:15:23.981Z" },
+    { url = "https://files.pythonhosted.org/packages/75/d3/785783f4ac3e04d7a982f1bae5482cdbb463e56f9215086d77ce001cae4c/rocksdb_py-0.0.5-cp311-cp311-macosx_10_14_x86_64.whl", hash = "sha256:785a40df814540d3cfc6713d4ca88a9e9f40ac1546dfb9baff624eace3c5e520", size = 3196753, upload-time = "2023-10-10T22:15:27.656Z" },
+    { url = "https://files.pythonhosted.org/packages/90/93/67ac7d013a8182c45c614a53cd23efa46bd91583c856ff33462fa94e6524/rocksdb_py-0.0.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:689b64c5ebe81ea908f6924b1683c99553d9c2ea53a55697f903ed1d4d57b92a", size = 2875369, upload-time = "2023-10-10T22:15:32.367Z" },
+    { url = "https://files.pythonhosted.org/packages/69/5e/e7f8397613ed7f6e3b0b8547ab361173bc3a240aec06591e95450648d2d9/rocksdb_py-0.0.5-cp311-cp311-manylinux_2_31_x86_64.whl", hash = "sha256:470e26aff4a89f91bdf874e53faf30f314e2c025a5510223e9bcd2ec9e76e3d8", size = 4686271, upload-time = "2023-10-10T22:15:38.669Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/28/dfaa32ea63cf88a083350c9d5e80d9e80817b2374ac8f7c1d0b75f1bb6cb/rocksdb_py-0.0.5-cp311-none-win_amd64.whl", hash = "sha256:f1e332fc8f3427920edfa9db3346c12c9cb2f88a0561aa9598fb5f0dcd71e430", size = 2359417, upload-time = "2023-10-10T22:15:43.374Z" },
+    { url = "https://files.pythonhosted.org/packages/4c/d7/20eb8d9eda7e854bf5798c32ab36fdbae2f1df83bfeeff8949da3f447b41/rocksdb_py-0.0.5-cp39-cp39-macosx_10_14_x86_64.whl", hash = "sha256:bea6d965aadb5b1815c132521f2ef3b3acc344d72b60eca8d33871181fef0525", size = 3196796, upload-time = "2023-10-10T22:15:47.74Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/f2/37f312989d8212ea4afd11e7f91140a38495c6d29d465715b4b506849c07/rocksdb_py-0.0.5-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:262c41d68f5f98d5fae5e33c16fd9e53fba506f1cd0b20514d36f144caf0d7b2", size = 2875319, upload-time = "2023-10-10T22:15:51.457Z" },
+    { url = "https://files.pythonhosted.org/packages/69/38/755ac17351c085e71f130cbe94b7428392b1145de66cd9af96fecdfdfd71/rocksdb_py-0.0.5-cp39-cp39-manylinux_2_31_x86_64.whl", hash = "sha256:6a73fb07efcbcfdb902fcd6ba32edd9f3386621d6b89e2e2921774c7d5fc9c84", size = 4685844, upload-time = "2023-10-10T22:15:57.227Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/90/96f430957fe59ff6cfc15afa333b160e3844830753e2293ab4b13de1317f/rocksdb_py-0.0.5-cp39-none-win_amd64.whl", hash = "sha256:f02bcf5869b1d88c294697cae01aac15c44611237e9eb9c775ef33e24514e7c8", size = 2359563, upload-time = "2023-10-10T22:16:01.562Z" },
+]
