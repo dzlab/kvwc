@@ -3,11 +3,9 @@ name = "kvwc"
 version = "0.1.0"
 description = "A key-value wide-column data store using RocksDB, supporting versioning and datasets."
 readme = "README.md"
-requires-python = ">=3.8"
-license = { text = "MIT License" } # Or choose your preferred license
-authors = [
-    { name = "Your Name", email = "your.email@example.com" }, # Replace with actual author info
-]
+requires-python = ">=3.9"
+license = { text = "Apache License 2.0" }
+authors = [{ name = "dzlab", email = "dzlabs@outlook.com" }]
 keywords = [
     "rocksdb",
     "key-value",
@@ -31,12 +29,12 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Operating System :: OS Independent",                           # If truly OS independent, otherwise specify
 ]
-dependencies = ["python-rocksdb"]
+dependencies = ["rocksdict"]
 
 [project.urls]
-Homepage = "https://github.com/your-username/vibecoding"   # Replace with your repo URL
-Repository = "https://github.com/your-username/vibecoding" # Replace with your repo URL
-# Bug Tracker = "https://github.com/your-username/vibecoding/issues" # Optional: Add if desired
+Homepage = "https://github.com/dzlab/kvwc"
+Repository = "https://github.com/dzlab/kvwc"
+BugTracker = "https://github.com/dzlab/kvwc/issues"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

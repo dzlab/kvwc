@@ -2,13 +2,8 @@ name: KVWC Tests
 
 on:
   push:
-    paths:
-      - "kvwc/**"
-      - ".github/workflows/ci.yml"
+    branches: [main]
   pull_request:
-    paths:
-      - "kvwc/**"
-      - ".github/workflows/ci.yml"
 
 jobs:
   test:
@@ -35,7 +30,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel cython
+          python -m pip install --upgrade pip setuptools wheel
           # If your WideColumnDB project had a requirements.txt, you might use:
           # pip install -r requirements.txt
           # To install the project itself (kvwc) and its dependencies from pyproject.toml:
