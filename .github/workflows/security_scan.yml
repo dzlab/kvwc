@@ -37,6 +37,7 @@ jobs:
       - name: Comment on PR with bandit report
         uses: actions/github-script@v6
         with:
+          path: kvwc
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
