@@ -37,9 +37,9 @@ jobs:
       - name: Comment on PR with bandit report
         uses: actions/github-script@v6
         with:
-          path: kvwc
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            console.log(__dirname);
             const fs = require('fs');
             const report = fs.readFileSync('bandit_report.txt', 'utf8');
             github.issues.createComment({
