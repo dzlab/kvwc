@@ -11,6 +11,9 @@ jobs:
     defaults:
       run:
         working-directory: ./kvwc
+    permissions:
+      issues: write
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
