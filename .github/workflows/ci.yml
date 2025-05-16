@@ -1,10 +1,10 @@
 name: KVWC Tests
 
-on: [push, pull_request]
+on: push
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./kvwc
@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel cython
+          python -m pip install --upgrade pip setuptools wheel cython==0.29.37
           # If your WideColumnDB project had a requirements.txt, you might use:
           # pip install -r requirements.txt
           # To install the project itself (kvwc) and its dependencies from pyproject.toml:
