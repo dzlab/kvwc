@@ -1,6 +1,19 @@
+import logging
 import rocksdict as rocksdb
 import struct
 import time
+
+# Set the logging level
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+# Create a console handler
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+# Create a formatter and attach it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+# Add the handlers to the logger
+logger.addHandler(console_handler)
 
 # Define a separator that's unlikely to appear in keys/column names
 KEY_SEPARATOR = b'\x00'
@@ -9,11 +22,11 @@ MAX_UINT64 = 2**64 - 1
 
 class WideColumnDB:
     def __init__(self, db_path):
-        opts = rocksdb.Option()
+        opts = rocksdb.Options()
         opts.create_if_missing(True)
         # For more advanced usage, you might explore Column Families here
         # to represent different datasets/tables within the same DB.
-        self.db = rocksdb.open(db_path, opts)
+        self.db = rocksdb.Rdict(db_path, opts)
 
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
@@ -113,18 +126,11 @@ class WideColumnDB:
                 prefix_parts.append(str(dataset_name).encode('utf-8'))
             prefix_parts.append(str(row_key).encode('utf-8'))
             scan_prefixes.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
-
-        for prefix_bytes in scan_prefixes:
-            it = self.db.iterator() # Iterate over values
-            it.seek(prefix_bytes) # Seek to the start of the prefix
-
-            # Need to iterate keys as well to decode them
-            kv_iterator = self.db.iterkeys()
-            kv_iterator.seek(prefix_bytes)
-
-            for rdb_key in kv_iterator:
+        logger.info(f'Prefixes to look for {scan_prefixes}')
+        for rdb_key, _ in self.db.items():
+            for prefix_bytes in scan_prefixes:
                 if not rdb_key.startswith(prefix_bytes):
-                    break # Moved past our prefix
+                    continue # Moved past our prefix
 
                 decoded = self._decode_key(rdb_key, has_dataset_name_in_key)
                 if not decoded:
@@ -161,15 +167,17 @@ class WideColumnDB:
         If column_names is provided, deletes only those columns.
         If specific_timestamps_ms (list) is provided with a single column_name, deletes only those specific versions.
         """
-        batch = rocksdb.WriteBatch()
+        batch, count = rocksdb.WriteBatch(), 0
         has_dataset_name_in_key = dataset_name is not None
 
         # Case 1: Delete specific timestamps for a single column
         if column_names and isinstance(column_names, str) and specific_timestamps_ms:
+            logger.info(f'Deleting a single column {column_names} with timestamps {specific_timestamps_ms}')
             single_col_name = column_names
             for ts_ms in specific_timestamps_ms:
                 rdb_key = self._encode_key(row_key, single_col_name, ts_ms, dataset_name)
                 batch.delete(rdb_key)
+                count += 1
             self.db.write(batch)
             return
 
@@ -193,19 +201,14 @@ class WideColumnDB:
             prefix_parts.append(str(row_key).encode('utf-8'))
             scan_prefixes_for_delete.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
 
-        for prefix_bytes in scan_prefixes_for_delete:
-            it = self.db.iterkeys()
-            it.seek(prefix_bytes)
-            keys_to_delete = []
-            for rdb_key in it:
+        logger.info(f'Scan prefixes to delete {scan_prefixes_for_delete}')
+        for rdb_key, _ in self.db.items():
+            for prefix_bytes in scan_prefixes_for_delete:
                 if not rdb_key.startswith(prefix_bytes):
-                    break
-                keys_to_delete.append(rdb_key)
-
-            for key_del in keys_to_delete:
-                batch.delete(key_del)
-
-        if batch.count() > 0: # Check if batch has operations
+                    continue
+                batch.delete(rdb_key)
+                count += 1
+        if count > 0: # Check if batch has operations
              self.db.write(batch)
 
     def close(self):
