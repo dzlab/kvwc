@@ -31,7 +31,24 @@ jobs:
 
       - name: Run security scan with bandit
         run: |
-          bandit -r .
+          bandit -r . > bandit_report.txt
+
+      - name: Comment on PR with bandit report
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('bandit_report.txt', 'utf8');
+            github.issues.createComment({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `**Bandit Security Scan Report:**
+              \`\`\`
+              ${report}
+              \`\`\``
+            })
 
       - name: Run safety check
         run: |
