@@ -1,4 +1,4 @@
-import rocksdbpy as rocksdb
+import rocksdict as rocksdb
 import struct
 import time
 
