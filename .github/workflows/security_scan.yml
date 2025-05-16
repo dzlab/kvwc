@@ -39,8 +39,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            console.log(process.cwd());
             const fs = require('fs');
+            console.log('Files in current folder:', fs.readdirSync(process.cwd()));
             const report = fs.readFileSync('bandit_report.txt', 'utf8');
             github.issues.createComment({
               issue_number: ${{ github.event.pull_request.number }},
