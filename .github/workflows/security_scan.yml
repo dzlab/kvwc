@@ -42,11 +42,8 @@ jobs:
       #     safety scan
 
       - name: Run Semgrep
-        uses: semgrep/semgrep@v1
-        with:
-          config: p/default
-          publish-results: false
         run: |
+          pip install semgrep
           semgrep --config=p/default --sarif --output=semgrep-results.sarif .
 
       - name: Comment on PR
