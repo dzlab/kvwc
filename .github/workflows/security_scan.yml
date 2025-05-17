@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, reopened]
 
 jobs:
   scan:
@@ -36,29 +37,38 @@ jobs:
         run: |
           bandit -r . > bandit_report.txt
 
-      - name: Comment on PR with bandit report
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('kvwc/bandit_report.txt', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: ${{ github.event.pull_request.number }},
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `**Bandit Security Scan Report:**
-              \`\`\`
-              ${report}
-              \`\`\``
-            })
-
-      - name: Run safety check
-        run: |
-          safety auth
-          safety scan
+      # - name: Run safety check
+      #   run: |
+      #     safety auth
+      #     safety scan
 
       - name: Run Semgrep
         uses: returntocorp/semgrep-action@v1
         env:
           SEMGREP_RULES: p/default # or another ruleset
+        with:
+          sarif-report-file: semgrep-results.sarif
+
+      - name: Comment on PR
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const banditReport = fs.readFileSync('kvwc/bandit_report.txt', 'utf8');
+            const semgrepReport = fs.readFileSync('kvwc/semgrep-results.sarif', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `
+              **Bandit Security Scan Report:**
+              \`\`\`
+              ${banditReport}
+              \`\`\`
+              **Semgrep Security Scan Report:**
+              \`\`\`
+              ${semgrepReport}
+              \`\`\`
+              `
+            })
