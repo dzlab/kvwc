@@ -55,6 +55,7 @@ jobs:
 
       - name: Run safety check
         run: |
+          safety auth
           safety scan
 
       - name: Run Semgrep
