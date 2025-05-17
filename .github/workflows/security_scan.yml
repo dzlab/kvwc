@@ -44,8 +44,7 @@ jobs:
       - name: Run Semgrep
         run: |
           pip install semgrep
-          semgrep --config=p/default --sarif --output=semgrep-results.sarif .
-          cat semgrep-results.sarif
+          semgrep --config=p/default --text --output=semgrep-results.txt .
 
       - name: Comment on PR
         uses: actions/github-script@v6
@@ -54,7 +53,7 @@ jobs:
           script: |
             const fs = require('fs');
             const banditReport = fs.readFileSync('kvwc/bandit_report.txt', 'utf8');
-            const semgrepReport = fs.readFileSync('kvwc/semgrep-results.sarif', 'utf8');
+            const semgrepReport = fs.readFileSync('kvwc/semgrep-results.txt', 'utf8');
             github.rest.issues.createComment({
               issue_number: ${{ github.event.pull_request.number }},
               owner: context.repo.owner,
