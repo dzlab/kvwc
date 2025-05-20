@@ -1,7 +1,7 @@
 import logging
 import rocksdict as rocksdb
-import struct
 import time
+from .key_codec import KeyCodec
 
 # Set the logging level
 logger = logging.getLogger(__name__)
@@ -15,11 +15,6 @@ console_handler.setFormatter(formatter)
 # Add the handlers to the logger
 logger.addHandler(console_handler)
 
-# Define a separator that's unlikely to appear in keys/column names
-KEY_SEPARATOR = b'\x00'
-# Assuming timestamps are uint64 (e.g., nanoseconds or milliseconds)
-MAX_UINT64 = 2**64 - 1
-
 class WideColumnDB:
     def __init__(self, db_path):
         opts = rocksdb.Options()
@@ -31,42 +26,6 @@ class WideColumnDB:
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
 
-    def _encode_key(self, row_key, column_name, timestamp_ms, dataset_name=None):
-        # Ensure inputs are strings if they are not already
-        row_key_bytes = str(row_key).encode('utf-8')
-        column_name_bytes = str(column_name).encode('utf-8')
-
-        # Invert timestamp for descending order (latest first)
-        inverted_ts = MAX_UINT64 - timestamp_ms
-        timestamp_bytes = struct.pack('>Q', inverted_ts) # Big-endian 8-byte unsigned int
-
-        if dataset_name:
-            dataset_name_bytes = str(dataset_name).encode('utf-8')
-            return dataset_name_bytes + KEY_SEPARATOR + row_key_bytes + KEY_SEPARATOR + column_name_bytes + KEY_SEPARATOR + timestamp_bytes
-        else:
-            return row_key_bytes + KEY_SEPARATOR + column_name_bytes + KEY_SEPARATOR + timestamp_bytes
-
-    def _decode_key(self, rdb_key_bytes, has_dataset_name=False):
-        parts = rdb_key_bytes.split(KEY_SEPARATOR)
-        offset = 0
-        dataset_name = None
-        if has_dataset_name:
-            if len(parts) < 4: return None # Malformed key
-            dataset_name = parts[0].decode('utf-8')
-            offset = 1
-
-        if len(parts) < (3 + offset): return None # Malformed key
-
-        row_key = parts[0 + offset].decode('utf-8')
-        column_name = parts[1 + offset].decode('utf-8')
-
-        try:
-            timestamp_bytes = parts[2 + offset]
-            inverted_ts = struct.unpack('>Q', timestamp_bytes)[0]
-            original_timestamp_ms = MAX_UINT64 - inverted_ts
-            return dataset_name, row_key, column_name, original_timestamp_ms
-        except (struct.error, IndexError):
-            return None # Malformed key
 
     # --- Public API Methods ---
 
@@ -81,7 +40,7 @@ class WideColumnDB:
             column_name, value = item[0], item[1]
             timestamp_ms = item[2] if len(item) > 2 and item[2] is not None else self._current_timestamp_ms()
 
-            rdb_key = self._encode_key(row_key, column_name, timestamp_ms, dataset_name)
+            rdb_key = KeyCodec.encode_key(row_key, column_name, timestamp_ms, dataset_name)
             rdb_value = str(value).encode('utf-8') # Assuming value can be stringified
             batch.put(rdb_key, rdb_value)
         self.db.write(batch)
@@ -118,21 +77,21 @@ class WideColumnDB:
                     prefix_parts.append(str(dataset_name).encode('utf-8'))
                 prefix_parts.append(str(row_key).encode('utf-8'))
                 prefix_parts.append(str(col_name).encode('utf-8'))
-                scan_prefixes.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
+                scan_prefixes.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
         else:
             # Prefix for all columns in a row: dataset? + row_key
             prefix_parts = []
             if dataset_name:
                 prefix_parts.append(str(dataset_name).encode('utf-8'))
             prefix_parts.append(str(row_key).encode('utf-8'))
-            scan_prefixes.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
+            scan_prefixes.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
         logger.info(f'Prefixes to look for {scan_prefixes}')
         for rdb_key, _ in self.db.items():
             for prefix_bytes in scan_prefixes:
                 if not rdb_key.startswith(prefix_bytes):
                     continue # Moved past our prefix
 
-                decoded = self._decode_key(rdb_key, has_dataset_name_in_key)
+                decoded = KeyCodec.decode_key(rdb_key, has_dataset_name_in_key)
                 if not decoded:
                     continue
 
@@ -175,7 +134,7 @@ class WideColumnDB:
             logger.info(f'Deleting a single column {column_names} with timestamps {specific_timestamps_ms}')
             single_col_name = column_names
             for ts_ms in specific_timestamps_ms:
-                rdb_key = self._encode_key(row_key, single_col_name, ts_ms, dataset_name)
+                rdb_key = KeyCodec.encode_key(row_key, single_col_name, ts_ms, dataset_name)
                 batch.delete(rdb_key)
                 count += 1
             self.db.write(batch)
@@ -194,12 +153,12 @@ class WideColumnDB:
                 if dataset_name: prefix_parts.append(str(dataset_name).encode('utf-8'))
                 prefix_parts.append(str(row_key).encode('utf-8'))
                 prefix_parts.append(str(col_name).encode('utf-8'))
-                scan_prefixes_for_delete.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
+                scan_prefixes_for_delete.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
         else: # Delete all columns for the row_key
             prefix_parts = []
             if dataset_name: prefix_parts.append(str(dataset_name).encode('utf-8'))
             prefix_parts.append(str(row_key).encode('utf-8'))
-            scan_prefixes_for_delete.append(KEY_SEPARATOR.join(prefix_parts) + KEY_SEPARATOR)
+            scan_prefixes_for_delete.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
 
         logger.info(f'Scan prefixes to delete {scan_prefixes_for_delete}')
         for rdb_key, _ in self.db.items():
