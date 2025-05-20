@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A key-value wide-column data store using RocksDB, supporting versioning and datasets."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Apache License 2.0" }
+license = "Apache-2.0"
 authors = [{ name = "dzlab", email = "dzlabs@outlook.com" }]
 keywords = [
     "rocksdb",
@@ -16,8 +16,7 @@ keywords = [
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",                              # Or Beta, Production/Stable as appropriate
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",                       # Match the license above
+    "Intended Audience :: Developers",                              # Match the license above
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
