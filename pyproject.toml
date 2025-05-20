@@ -16,8 +16,7 @@ keywords = [
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",                              # Or Beta, Production/Stable as appropriate
-    "Intended Audience :: Developers",
-    "License :: Apache License 2.0",                                # Match the license above
+    "Intended Audience :: Developers",                              # Match the license above
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
