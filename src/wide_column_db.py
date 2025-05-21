@@ -32,8 +32,9 @@ class WideColumnDB:
     def put_row(self, row_key, items, dataset_name=None):
         """
         Puts items into a row.
-        items: list of tuples (column_name, value, optional_timestamp_ms)
-               If timestamp_ms is None, current server time is used.
+        items: list of tuples, where each tuple is either:
+               (column_name, value) - current server time is used as timestamp.
+               (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
         batch = rocksdb.WriteBatch()
         for item in items:
