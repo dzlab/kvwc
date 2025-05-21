@@ -211,6 +211,8 @@ class TestWideColumnDB(unittest.TestCase):
         self.assertIn((timestamps[2], values[2]), result[col_name]) # v_mid_new (newer)
         self.assertIn((timestamps[1], values[1]), result[col_name]) # v_mid_old
 
+
+
         # Range: only newest
         result = self.db.get_row(row_key, [col_name], start_ts_ms=timestamps[3], num_versions=10)
         self.assertEqual(len(result[col_name]), 1)

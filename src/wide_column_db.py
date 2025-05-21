@@ -76,36 +76,54 @@ class WideColumnDB:
         else:
             # Prefix for all columns in a row: dataset? + row_key
             scan_prefixes.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key))
+
         logger.info(f'Prefixes to look for {scan_prefixes}')
-        for rdb_key, _ in self.db.items():
-            for prefix_bytes in scan_prefixes:
+
+        # Use RocksDB iterator with seek for efficient scanning
+        # Iterate through each prefix and use from_key to seek
+        for prefix_bytes in scan_prefixes:
+            # Use items(from_key=prefix_bytes) to seek to the start of the prefix range
+            for rdb_key, rdb_value_bytes in self.db.items(from_key=prefix_bytes):
+                # Stop when the key no longer starts with the current prefix
                 if not rdb_key.startswith(prefix_bytes):
-                    continue # Moved past our prefix
+                    break # Exit the inner loop for this prefix
 
+                # Decode the key to get components
                 decoded = KeyCodec.decode_key(rdb_key, has_dataset_name_in_key)
+
                 if not decoded:
+                    logger.warning(f"Skipping malformed key during scan starting from {prefix_bytes.hex()}: {rdb_key.hex()}")
                     continue
 
-                _, _, current_col_name, current_ts_ms = decoded
+                # Assuming decode_key returns (dataset_name, row_key, column_name, original_timestamp_ms)
+                try:
+                    _, _, current_col_name, current_ts_ms = decoded
+                except ValueError:
+                     logger.warning(f"Unexpected number of decoded parts for key {rdb_key.hex()}")
+                     continue
 
-                # Time range filtering
+
+                # Apply time range filtering
+                # Keys within a column prefix are sorted reverse-chronologically by timestamp (newest first).
                 if start_ts_ms is not None and current_ts_ms < start_ts_ms:
-                    continue
+                    # This version is too old. Since we iterate newest-to-oldest,
+                    # all subsequent versions will also be too old.
+                    break # Optimization: Exit inner loop for this prefix/column
                 if end_ts_ms is not None and current_ts_ms > end_ts_ms:
-                    # Since keys are sorted reverse-chronologically for timestamp,
-                    # if we pass end_ts_ms, subsequent keys for this column will also be too old.
-                    # This logic might need refinement if scanning multiple columns with one prefix.
-                    # For simplicity, we continue scanning, but a more optimized seek might be possible.
+                    # This version is too new. Skip it and continue to the next (older) version.
                     continue
 
+                # Collect results, respecting num_versions
                 if current_col_name not in results:
                     results[current_col_name] = []
 
+                # Add the version if we haven't reached the version limit for this column
                 if len(results[current_col_name]) < num_versions:
-                    rdb_value_bytes = self.db.get(rdb_key)
-                    if rdb_value_bytes is not None:
+                     if rdb_value_bytes is not None:
                          results[current_col_name].append((current_ts_ms, rdb_value_bytes.decode('utf-8')))
-                # else: if we are scanning for specific columns, we might break early once versions are met for that column
+                # else: num_versions reached for this column, skip adding this version, but continue scanning
+                # the prefix in case there are other columns covered by this prefix (if it's a row prefix scan).
+
 
         return results
 
