@@ -18,8 +18,7 @@ class KeyCodec:
     KEY_SEPARATOR = b'\x00'
     MAX_UINT64 = 2**64 - 1
 
-    @staticmethod
-    def encode(dataset_name=None, row_key=None, column_name=None, timestamp_ms=None):
+    def encode(self, dataset_name=None, row_key=None, column_name=None, timestamp_ms=None):
         """
         Encodes components into a RocksDB key byte string or a prefix byte string.
         If timestamp_ms is provided, encodes a full key.
@@ -50,8 +49,7 @@ class KeyCodec:
             return KeyCodec.KEY_SEPARATOR.join(parts) + KeyCodec.KEY_SEPARATOR
 
 
-    @staticmethod
-    def decode_key(rdb_key_bytes):
+    def decode(self, rdb_key_bytes):
         """
         Decodes a RocksDB key byte string back into its components.
         Assumes the key is a full key ending with a timestamp.

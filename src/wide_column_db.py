@@ -22,6 +22,7 @@ class WideColumnDB:
         # For more advanced usage, you might explore Column Families here
         # to represent different datasets/tables within the same DB.
         self.db = rocksdb.Rdict(db_path, opts)
+        self.key_codec = KeyCodec()
 
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
@@ -41,7 +42,7 @@ class WideColumnDB:
             column_name, value = item[0], item[1]
             timestamp_ms = item[2] if len(item) > 2 and item[2] is not None else self._current_timestamp_ms()
 
-            rdb_key = KeyCodec.encode(dataset_name=dataset_name, row_key=row_key, column_name=column_name, timestamp_ms=timestamp_ms)
+            rdb_key = self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=column_name, timestamp_ms=timestamp_ms)
             rdb_value = str(value).encode('utf-8') # Assuming value can be stringified
             batch.put(rdb_key, rdb_value)
         self.db.write(batch)
@@ -68,10 +69,10 @@ class WideColumnDB:
         if target_columns:
             for col_name in target_columns:
                 # Prefix for a specific column: dataset? + row_key + col_name
-                scan_prefixes.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
+                scan_prefixes.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
         else:
             # Prefix for all columns in a row: dataset? + row_key
-            scan_prefixes.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key))
+            scan_prefixes.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key))
 
         logger.info(f'Prefixes to look for {scan_prefixes}')
 
@@ -85,13 +86,13 @@ class WideColumnDB:
                     break # Exit the inner loop for this prefix
 
                 # Decode the key to get components
-                decoded = KeyCodec.decode_key(rdb_key)
+                decoded = self.key_codec.decode(rdb_key)
 
                 if not decoded:
                     logger.warning(f"Skipping malformed key during scan starting from {prefix_bytes.hex()}: {rdb_key.hex()}")
                     continue
 
-                # Assuming decode_key returns (dataset_name, row_key, column_name, original_timestamp_ms)
+                # Assuming decode returns (dataset_name, row_key, column_name, original_timestamp_ms)
                 try:
                     _, _, current_col_name, current_ts_ms = decoded
                 except ValueError:
@@ -138,7 +139,7 @@ class WideColumnDB:
             logger.info(f'Deleting a single column {column_names} with timestamps {specific_timestamps_ms}')
             single_col_name = column_names
             for ts_ms in specific_timestamps_ms:
-                rdb_key = KeyCodec.encode(dataset_name, row_key, single_col_name, ts_ms)
+                rdb_key = self.key_codec.encode(dataset_name, row_key, single_col_name, ts_ms)
                 batch.delete(rdb_key)
                 count += 1
             self.db.write(batch)
@@ -153,9 +154,9 @@ class WideColumnDB:
         scan_prefixes_for_delete = []
         if target_cols_to_scan: # Delete specific columns
             for col_name in target_cols_to_scan:
-                scan_prefixes_for_delete.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
+                scan_prefixes_for_delete.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
         else: # Delete all columns for the row_key
-            scan_prefixes_for_delete.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key))
+            scan_prefixes_for_delete.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key))
 
         logger.info(f'Scan prefixes to delete {scan_prefixes_for_delete}')
         for rdb_key, _ in self.db.items():
