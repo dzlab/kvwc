@@ -121,6 +121,8 @@ class TestWideColumnDB(unittest.TestCase):
 
         time_before_put = int(time.time() * 1000)
         self.db.put_row(row_key, [(col_name, value)]) # No timestamp provided
+        # Add a small sleep to ensure the write is visible before reading
+        time.sleep(0.1)
         time_after_put = int(time.time() * 1000)
 
         result = self.db.get_row(row_key, column_names=[col_name])
@@ -210,6 +212,8 @@ class TestWideColumnDB(unittest.TestCase):
         self.assertEqual(len(result[col_name]), 2)
         self.assertIn((timestamps[2], values[2]), result[col_name]) # v_mid_new (newer)
         self.assertIn((timestamps[1], values[1]), result[col_name]) # v_mid_old
+
+
 
         # Range: only newest
         result = self.db.get_row(row_key, [col_name], start_ts_ms=timestamps[3], num_versions=10)

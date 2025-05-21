@@ -22,6 +22,7 @@ class WideColumnDB:
         # For more advanced usage, you might explore Column Families here
         # to represent different datasets/tables within the same DB.
         self.db = rocksdb.Rdict(db_path, opts)
+        self.key_codec = KeyCodec()
 
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
@@ -32,15 +33,16 @@ class WideColumnDB:
     def put_row(self, row_key, items, dataset_name=None):
         """
         Puts items into a row.
-        items: list of tuples (column_name, value, optional_timestamp_ms)
-               If timestamp_ms is None, current server time is used.
+        items: list of tuples, where each tuple is either:
+               (column_name, value) - current server time is used as timestamp.
+               (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
         batch = rocksdb.WriteBatch()
         for item in items:
             column_name, value = item[0], item[1]
             timestamp_ms = item[2] if len(item) > 2 and item[2] is not None else self._current_timestamp_ms()
 
-            rdb_key = KeyCodec.encode_key(row_key, column_name, timestamp_ms, dataset_name)
+            rdb_key = self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=column_name, timestamp_ms=timestamp_ms)
             rdb_value = str(value).encode('utf-8') # Assuming value can be stringified
             batch.put(rdb_key, rdb_value)
         self.db.write(batch)
@@ -51,11 +53,6 @@ class WideColumnDB:
         Returns a dictionary: {column_name: [(timestamp_ms, value), ...]}
         """
         results = {}
-
-        # Determine if we expect a dataset name in the key structure
-        # This is a simplification; in a real system, you'd know based on how datasets are managed.
-        # For this example, we assume if dataset_name is provided, keys were stored with it.
-        has_dataset_name_in_key = dataset_name is not None
 
         # Build the prefix for scanning
         # If specific column_names are given, we iterate and build prefixes for each.
@@ -72,49 +69,58 @@ class WideColumnDB:
         if target_columns:
             for col_name in target_columns:
                 # Prefix for a specific column: dataset? + row_key + col_name
-                prefix_parts = []
-                if dataset_name:
-                    prefix_parts.append(str(dataset_name).encode('utf-8'))
-                prefix_parts.append(str(row_key).encode('utf-8'))
-                prefix_parts.append(str(col_name).encode('utf-8'))
-                scan_prefixes.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+                scan_prefixes.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
         else:
             # Prefix for all columns in a row: dataset? + row_key
-            prefix_parts = []
-            if dataset_name:
-                prefix_parts.append(str(dataset_name).encode('utf-8'))
-            prefix_parts.append(str(row_key).encode('utf-8'))
-            scan_prefixes.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+            scan_prefixes.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key))
+
         logger.info(f'Prefixes to look for {scan_prefixes}')
-        for rdb_key, _ in self.db.items():
-            for prefix_bytes in scan_prefixes:
+
+        # Use RocksDB iterator with seek for efficient scanning
+        # Iterate through each prefix and use from_key to seek
+        for prefix_bytes in scan_prefixes:
+            # Use items(from_key=prefix_bytes) to seek to the start of the prefix range
+            for rdb_key, rdb_value_bytes in self.db.items(from_key=prefix_bytes):
+                # Stop when the key no longer starts with the current prefix
                 if not rdb_key.startswith(prefix_bytes):
-                    continue # Moved past our prefix
+                    break # Exit the inner loop for this prefix
 
-                decoded = KeyCodec.decode_key(rdb_key, has_dataset_name_in_key)
+                # Decode the key to get components
+                decoded = self.key_codec.decode(rdb_key)
+
                 if not decoded:
+                    logger.warning(f"Skipping malformed key during scan starting from {prefix_bytes.hex()}: {rdb_key.hex()}")
                     continue
 
-                _, _, current_col_name, current_ts_ms = decoded
+                # Assuming decode returns (dataset_name, row_key, column_name, original_timestamp_ms)
+                try:
+                    _, _, current_col_name, current_ts_ms = decoded
+                except ValueError:
+                     logger.warning(f"Unexpected number of decoded parts for key {rdb_key.hex()}")
+                     continue
 
-                # Time range filtering
+
+                # Apply time range filtering
+                # Keys within a column prefix are sorted reverse-chronologically by timestamp (newest first).
                 if start_ts_ms is not None and current_ts_ms < start_ts_ms:
-                    continue
+                    # This version is too old. Since we iterate newest-to-oldest,
+                    # all subsequent versions will also be too old.
+                    break # Optimization: Exit inner loop for this prefix/column
                 if end_ts_ms is not None and current_ts_ms > end_ts_ms:
-                    # Since keys are sorted reverse-chronologically for timestamp,
-                    # if we pass end_ts_ms, subsequent keys for this column will also be too old.
-                    # This logic might need refinement if scanning multiple columns with one prefix.
-                    # For simplicity, we continue scanning, but a more optimized seek might be possible.
+                    # This version is too new. Skip it and continue to the next (older) version.
                     continue
 
+                # Collect results, respecting num_versions
                 if current_col_name not in results:
                     results[current_col_name] = []
 
+                # Add the version if we haven't reached the version limit for this column
                 if len(results[current_col_name]) < num_versions:
-                    rdb_value_bytes = self.db.get(rdb_key)
-                    if rdb_value_bytes is not None:
+                     if rdb_value_bytes is not None:
                          results[current_col_name].append((current_ts_ms, rdb_value_bytes.decode('utf-8')))
-                # else: if we are scanning for specific columns, we might break early once versions are met for that column
+                # else: num_versions reached for this column, skip adding this version, but continue scanning
+                # the prefix in case there are other columns covered by this prefix (if it's a row prefix scan).
+
 
         return results
 
@@ -127,14 +133,13 @@ class WideColumnDB:
         If specific_timestamps_ms (list) is provided with a single column_name, deletes only those specific versions.
         """
         batch, count = rocksdb.WriteBatch(), 0
-        has_dataset_name_in_key = dataset_name is not None
 
         # Case 1: Delete specific timestamps for a single column
         if column_names and isinstance(column_names, str) and specific_timestamps_ms:
             logger.info(f'Deleting a single column {column_names} with timestamps {specific_timestamps_ms}')
             single_col_name = column_names
             for ts_ms in specific_timestamps_ms:
-                rdb_key = KeyCodec.encode_key(row_key, single_col_name, ts_ms, dataset_name)
+                rdb_key = self.key_codec.encode(dataset_name, row_key, single_col_name, ts_ms)
                 batch.delete(rdb_key)
                 count += 1
             self.db.write(batch)
@@ -149,16 +154,9 @@ class WideColumnDB:
         scan_prefixes_for_delete = []
         if target_cols_to_scan: # Delete specific columns
             for col_name in target_cols_to_scan:
-                prefix_parts = []
-                if dataset_name: prefix_parts.append(str(dataset_name).encode('utf-8'))
-                prefix_parts.append(str(row_key).encode('utf-8'))
-                prefix_parts.append(str(col_name).encode('utf-8'))
-                scan_prefixes_for_delete.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+                scan_prefixes_for_delete.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
         else: # Delete all columns for the row_key
-            prefix_parts = []
-            if dataset_name: prefix_parts.append(str(dataset_name).encode('utf-8'))
-            prefix_parts.append(str(row_key).encode('utf-8'))
-            scan_prefixes_for_delete.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+            scan_prefixes_for_delete.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key))
 
         logger.info(f'Scan prefixes to delete {scan_prefixes_for_delete}')
         for rdb_key, _ in self.db.items():
