@@ -10,7 +10,8 @@ class KeyCodec:
     """
     A class for encoding and decoding keys used in the WideColumnDB.
     Keys are structured to support efficient retrieval by row, column, and time range.
-    Key format: [dataset_name]\x00[row_key]\x00[column_name]\x00[inverted_timestamp_ms]
+    Key format (full key): [dataset_name]\x00[row_key]\x00[column_name]\x00[inverted_timestamp_ms]
+    Key format (prefix): [dataset_name]\x00[row_key]\x00[column_name]\x00
     Timestamp is inverted to ensure descending order (latest first).
     """
 
@@ -18,28 +19,36 @@ class KeyCodec:
     MAX_UINT64 = 2**64 - 1
 
     @staticmethod
-    def encode_key(row_key, column_name, timestamp_ms, dataset_name=None):
+    def encode(dataset_name=None, row_key=None, column_name=None, timestamp_ms=None):
         """
-        Encodes components into a RocksDB key byte string.
-        Key format: [dataset_name]\x00[row_key]\x00[column_name]\x00[inverted_timestamp_ms]
-        Timestamp is inverted to ensure descending order (latest first).
+        Encodes components into a RocksDB key byte string or a prefix byte string.
+        If timestamp_ms is provided, encodes a full key.
+        If timestamp_ms is None, encodes a prefix.
         """
-        # Ensure inputs are strings if they are not already
-        row_key_bytes = str(row_key).encode('utf-8')
-        column_name_bytes = str(column_name).encode('utf-8')
-
-        # Invert timestamp for descending order (latest first)
-        inverted_ts = KeyCodec.MAX_UINT64 - timestamp_ms
-        timestamp_bytes = struct.pack('>Q', inverted_ts) # Big-endian 8-byte unsigned int
-
         parts = []
-        if dataset_name:
-            parts.append(str(dataset_name).encode('utf-8'))
-        parts.append(row_key_bytes)
-        parts.append(column_name_bytes)
-        parts.append(timestamp_bytes)
 
-        return KeyCodec.KEY_SEPARATOR.join(parts)
+        if dataset_name is not None:
+            parts.append(str(dataset_name).encode('utf-8'))
+
+        if row_key is not None:
+            parts.append(str(row_key).encode('utf-8'))
+
+        if column_name is not None:
+            parts.append(str(column_name).encode('utf-8'))
+
+        if timestamp_ms is not None:
+            # This is a full key
+            # Invert timestamp for descending order (latest first)
+            inverted_ts = KeyCodec.MAX_UINT64 - timestamp_ms
+            timestamp_bytes = struct.pack('>Q', inverted_ts) # Big-endian 8-byte unsigned int
+            parts.append(timestamp_bytes)
+            return KeyCodec.KEY_SEPARATOR.join(parts)
+        else:
+            # This is a prefix for scanning/deletion
+            # Append the separator to make it a valid prefix that matches keys
+            # starting with these components followed by a separator.
+            return KeyCodec.KEY_SEPARATOR.join(parts) + KeyCodec.KEY_SEPARATOR
+
 
     @staticmethod
     def decode_key(rdb_key_bytes, has_dataset_name=False):
@@ -65,6 +74,11 @@ class KeyCodec:
             row_key = parts[0 + offset].decode('utf-8')
             column_name = parts[1 + offset].decode('utf-8')
             timestamp_bytes = parts[2 + offset]
+
+            # Ensure timestamp_bytes has the correct length for unpacking
+            if len(timestamp_bytes) != struct.calcsize('>Q'):
+                 logging.warning(f"Malformed timestamp bytes during decode: {rdb_key_bytes}")
+                 return None
 
             inverted_ts = struct.unpack('>Q', timestamp_bytes)[0]
             original_timestamp_ms = KeyCodec.MAX_UINT64 - inverted_ts

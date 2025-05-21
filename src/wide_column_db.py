@@ -40,7 +40,7 @@ class WideColumnDB:
             column_name, value = item[0], item[1]
             timestamp_ms = item[2] if len(item) > 2 and item[2] is not None else self._current_timestamp_ms()
 
-            rdb_key = KeyCodec.encode_key(row_key, column_name, timestamp_ms, dataset_name)
+            rdb_key = KeyCodec.encode(dataset_name=dataset_name, row_key=row_key, column_name=column_name, timestamp_ms=timestamp_ms)
             rdb_value = str(value).encode('utf-8') # Assuming value can be stringified
             batch.put(rdb_key, rdb_value)
         self.db.write(batch)
@@ -72,19 +72,10 @@ class WideColumnDB:
         if target_columns:
             for col_name in target_columns:
                 # Prefix for a specific column: dataset? + row_key + col_name
-                prefix_parts = []
-                if dataset_name:
-                    prefix_parts.append(str(dataset_name).encode('utf-8'))
-                prefix_parts.append(str(row_key).encode('utf-8'))
-                prefix_parts.append(str(col_name).encode('utf-8'))
-                scan_prefixes.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+                scan_prefixes.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
         else:
             # Prefix for all columns in a row: dataset? + row_key
-            prefix_parts = []
-            if dataset_name:
-                prefix_parts.append(str(dataset_name).encode('utf-8'))
-            prefix_parts.append(str(row_key).encode('utf-8'))
-            scan_prefixes.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+            scan_prefixes.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key))
         logger.info(f'Prefixes to look for {scan_prefixes}')
         for rdb_key, _ in self.db.items():
             for prefix_bytes in scan_prefixes:
@@ -134,7 +125,7 @@ class WideColumnDB:
             logger.info(f'Deleting a single column {column_names} with timestamps {specific_timestamps_ms}')
             single_col_name = column_names
             for ts_ms in specific_timestamps_ms:
-                rdb_key = KeyCodec.encode_key(row_key, single_col_name, ts_ms, dataset_name)
+                rdb_key = KeyCodec.encode(dataset_name, row_key, single_col_name, ts_ms)
                 batch.delete(rdb_key)
                 count += 1
             self.db.write(batch)
@@ -149,16 +140,9 @@ class WideColumnDB:
         scan_prefixes_for_delete = []
         if target_cols_to_scan: # Delete specific columns
             for col_name in target_cols_to_scan:
-                prefix_parts = []
-                if dataset_name: prefix_parts.append(str(dataset_name).encode('utf-8'))
-                prefix_parts.append(str(row_key).encode('utf-8'))
-                prefix_parts.append(str(col_name).encode('utf-8'))
-                scan_prefixes_for_delete.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+                scan_prefixes_for_delete.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key, column_name=col_name))
         else: # Delete all columns for the row_key
-            prefix_parts = []
-            if dataset_name: prefix_parts.append(str(dataset_name).encode('utf-8'))
-            prefix_parts.append(str(row_key).encode('utf-8'))
-            scan_prefixes_for_delete.append(KeyCodec.KEY_SEPARATOR.join(prefix_parts) + KeyCodec.KEY_SEPARATOR)
+            scan_prefixes_for_delete.append(KeyCodec.encode(dataset_name=dataset_name, row_key=row_key))
 
         logger.info(f'Scan prefixes to delete {scan_prefixes_for_delete}')
         for rdb_key, _ in self.db.items():
