@@ -52,11 +52,6 @@ class WideColumnDB:
         """
         results = {}
 
-        # Determine if we expect a dataset name in the key structure
-        # This is a simplification; in a real system, you'd know based on how datasets are managed.
-        # For this example, we assume if dataset_name is provided, keys were stored with it.
-        has_dataset_name_in_key = dataset_name is not None
-
         # Build the prefix for scanning
         # If specific column_names are given, we iterate and build prefixes for each.
         # If not, we build a prefix for the entire row.
@@ -89,7 +84,7 @@ class WideColumnDB:
                     break # Exit the inner loop for this prefix
 
                 # Decode the key to get components
-                decoded = KeyCodec.decode_key(rdb_key, has_dataset_name_in_key)
+                decoded = KeyCodec.decode_key(rdb_key)
 
                 if not decoded:
                     logger.warning(f"Skipping malformed key during scan starting from {prefix_bytes.hex()}: {rdb_key.hex()}")
@@ -136,7 +131,6 @@ class WideColumnDB:
         If specific_timestamps_ms (list) is provided with a single column_name, deletes only those specific versions.
         """
         batch, count = rocksdb.WriteBatch(), 0
-        has_dataset_name_in_key = dataset_name is not None
 
         # Case 1: Delete specific timestamps for a single column
         if column_names and isinstance(column_names, str) and specific_timestamps_ms:
