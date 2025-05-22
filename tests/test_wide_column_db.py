@@ -18,18 +18,18 @@ import sys
 #     └── test_wide_column_db.py
 #
 # Path calculation:
-# __file__ is .../vibecoding/kvwc/tests/test_wide_column_db.py
-# SCRIPT_DIR is .../vibecoding/kvwc/tests/
-# KVWC_DIR (directory of the 'kvwc' package) is .../vibecoding/kvwc/
-# PROJECT_ROOT_DIR (directory containing the 'kvwc' package) is .../vibecoding/
+# __file__ is .../kvwc/tests/test_wide_column_db.py
+# SCRIPT_DIR is .../kvwc/tests/
+# KVWC_DIR (directory of the 'kvwc' package) is .../kvwc/
+# PROJECT_ROOT_DIR (directory containing the 'kvwc' package) is .../
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-KVWC_DIR = os.path.dirname(SCRIPT_DIR) # This is vibecoding/kvwc
-PROJECT_ROOT_DIR = os.path.dirname(KVWC_DIR) # This is vibecoding/
+KVWC_DIR = os.path.dirname(SCRIPT_DIR) # This is kvwc
+PROJECT_ROOT_DIR = os.path.dirname(KVWC_DIR) # This is /
 
 if PROJECT_ROOT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_DIR)
 
-from kvwc import WideColumnDB, MAX_UINT64, KEY_SEPARATOR
+from src import WideColumnDB, MAX_UINT64, KEY_SEPARATOR
 
 TEST_DB_PATH_BASE = "test_db_temp_wide_column_main"
 
