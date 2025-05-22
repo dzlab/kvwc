@@ -5,24 +5,19 @@ from .key_codec import KeyCodec
 
 # Set the logging level
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-# Create a formatter and attach it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-# Add the handlers to the logger
-logger.addHandler(console_handler)
+
 
 class WideColumnDB:
-    def __init__(self, db_path):
+    def __init__(self, db_path, key_codec=None):
         opts = rocksdb.Options()
         opts.create_if_missing(True)
         # For more advanced usage, you might explore Column Families here
         # to represent different datasets/tables within the same DB.
         self.db = rocksdb.Rdict(db_path, opts)
-        self.key_codec = KeyCodec()
+        if key_codec is None:
+            self.key_codec = KeyCodec()
+        else:
+            self.key_codec = key_codec
 
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
