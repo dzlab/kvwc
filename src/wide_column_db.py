@@ -5,15 +5,7 @@ from .key_codec import KeyCodec
 
 # Set the logging level
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-# Create a console handler
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-# Create a formatter and attach it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-console_handler.setFormatter(formatter)
-# Add the handlers to the logger
-logger.addHandler(console_handler)
+
 
 class WideColumnDB:
     def __init__(self, db_path, key_codec=None):
