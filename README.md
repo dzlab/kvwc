@@ -1,6 +1,11 @@
 # Key-Value Wide Column (KVWC) Database
 
-KVWC is a Python library that implements a key-value wide-column data store, leveraging RocksDB as its underlying storage engine. It allows you to store and retrieve data organized by row keys, column names, and timestamps, providing versioning capabilities for your data.
+[![Build Status](https://github.com/dzlab/kvwc/actions/workflows/main.yml/badge.svg)](https://github.com/dzlab/kvwc/actions/workflows/main.yml)
+[![PyPI version](https://img.shields.io/pypi/v/kvwc)](https://pypi.org/project/kvwc/)
+[![Supported Python versions](https://img.shields.io/pypi/pyversions/kvwc)](https://pypi.org/project/kvwc/)
+[![License](https://img.shields.io/github/license/dzlab/kvwc)](https://github.com/dzlab/kvwc/blob/main/LICENSE)
+
+KVWC is a Python library that implements a key-value wide-column data store, leveraging RocksDB as its underlying storage engine. It allows you to store and retrieve data organized by row keys, column names, and timestamps, providing versioning capabilities for your data. Learn more in this article - [link](https://dzlab.github.io/database/2025/05/11/wide-column-database/).
 
 ## Features
 
