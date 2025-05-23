@@ -154,10 +154,14 @@ class WideColumnDB:
             scan_prefixes_for_delete.append(self.key_codec.encode(dataset_name=dataset_name, row_key=row_key))
 
         logger.info(f'Scan prefixes to delete {scan_prefixes_for_delete}')
-        for rdb_key, _ in self.db.items():
-            for prefix_bytes in scan_prefixes_for_delete:
+        # Iterate through each prefix and use from_key to seek
+        for prefix_bytes in scan_prefixes_for_delete:
+            # Use items(from_key=prefix_bytes) to seek to the start of the prefix range
+            for rdb_key, _ in self.db.items(from_key=prefix_bytes):
+                # Stop when the key no longer starts with the current prefix
                 if not rdb_key.startswith(prefix_bytes):
-                    continue
+                    break # Exit the inner loop for this prefix
+
                 batch.delete(rdb_key)
                 count += 1
         if count > 0: # Check if batch has operations
