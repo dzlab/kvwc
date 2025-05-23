@@ -28,7 +28,10 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Operating System :: OS Independent",                           # If truly OS independent, otherwise specify
 ]
-dependencies = ["rocksdict"]
+dependencies = [
+    "msgpack-python>=0.5.6",
+    "rocksdict",
+]
 
 [project.urls]
 Homepage = "https://github.com/dzlab/kvwc"
