@@ -23,7 +23,12 @@ class WideColumnDB:
         opts.create_if_missing(True)
         # For more advanced usage, you might explore Column Families here
         # to represent different datasets/tables within the same DB.
-        self.db = rocksdb.Rdict(db_path, opts)
+        try:
+            self.db = rocksdb.Rdict(db_path, opts)
+        except Exception as e:
+            logger.error(f"Failed to open RocksDB database at {db_path}: {e}")
+            # Depending on requirements, you might want to re-raise the exception
+            raise e
         if key_codec is None:
             self.key_codec = KeyCodec()
         else:
@@ -53,6 +58,8 @@ class WideColumnDB:
                (column_name, value) - current server time is used as timestamp.
                (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
+        if not self.db:
+            raise RuntimeError("Database is not initialized. Cannot perform put_row operation.")
         batch, count  = rocksdb.WriteBatch(), 0
         for item in items:
             column_name, value = item[0], item[1]
@@ -68,13 +75,20 @@ class WideColumnDB:
                  logger.warning(f"Serialization failed for value of type {type(value).__name__} for row '{row_key}', column '{column_name}'. Skipping item.")
 
         if count > 0: # Only write if batch is not empty
-             self.db.write(batch)
+            try:
+                 self.db.write(batch)
+            except Exception as e:
+                 logger.error(f"Error writing batch to database for row '{row_key}': {e}")
+                 # Re-raise the exception to indicate failure
+                 raise e
 
     def get_row(self, row_key, column_names=None, num_versions=1, dataset_name=None, start_ts_ms=None, end_ts_ms=None):
         """
         Gets data for a row.
         Returns a dictionary: {column_name: [(timestamp_ms, value), ...]}
         """
+        if not self.db:
+            raise RuntimeError("Database is not initialized. Cannot perform get_row operation.")
         results = {}
 
         # Build the prefix for scanning
@@ -161,6 +175,8 @@ class WideColumnDB:
         If column_names is provided, deletes only those columns.
         If specific_timestamps_ms (list) is provided with a single column_name, deletes only those specific versions.
         """
+        if not self.db:
+            raise RuntimeError("Database is not initialized. Cannot perform delete_row operation.")
         batch, count = rocksdb.WriteBatch(), 0
 
         # Case 1: Delete specific timestamps for a single column
@@ -171,7 +187,13 @@ class WideColumnDB:
                 rdb_key = self.key_codec.encode(dataset_name, row_key, single_col_name, ts_ms)
                 batch.delete(rdb_key)
                 count += 1
-            self.db.write(batch)
+            if self.db:
+                try:
+                    self.db.write(batch)
+                except Exception as e:
+                    logger.error(f"Error writing batch for specific timestamp deletion for row '{row_key}', column '{single_col_name}': {e}")
+                    # Re-raise the exception to indicate failure
+                    raise e
             return
 
         # Case 2 & 3: Delete columns or entire row (prefix-based deletion)
