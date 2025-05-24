@@ -377,8 +377,11 @@ class TestWideColumnDB(unittest.TestCase):
         temp_db.close()
         self.assertIsNone(temp_db.db) # Internal RocksDB instance should be None
 
-        with self.assertRaises(AttributeError): # 'NoneType' object has no attribute 'write'
+        with self.assertRaises(RuntimeError):
             temp_db.put_row("r2", [("c2", "v2", self.current_time + 1)])
+
+        with self.assertRaises(RuntimeError):
+            temp_db.get_row("r2", "c2")
 
         # Ensure the directory is cleaned up if not handled by instance tearDown
         if os.path.exists(db_path_close):
