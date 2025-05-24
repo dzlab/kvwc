@@ -122,6 +122,12 @@ class WideColumnDB:
                      logger.warning(f"Unexpected number of decoded parts for key {rdb_key.hex()}")
                      continue
 
+                # Optimization: If we've already collected num_versions for this column,
+                # skip processing further older versions for this column.
+                # Note: This optimization works because keys for a column prefix are sorted by timestamp descending.
+                if current_col_name in results and len(results[current_col_name]) >= num_versions:
+                    continue # Move to the next key from the iterator
+
 
                 # Apply time range filtering
                 # Keys within a column prefix are sorted reverse-chronologically by timestamp (newest first).

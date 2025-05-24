@@ -466,6 +466,50 @@ class TestWideColumnDB(unittest.TestCase):
         self.assertEqual(len(result_all_latest["colC"]), 1)
         self.assertEqual(result_all_latest["colC"][0], (ts - 3, "C_v2"))
 
+    def test_get_row_num_versions_optimization(self):
+        # Test the optimization where iteration stops after num_versions are found per column
+        row_key = "optimization_test_row"
+        col_name = "data_points"
+        ts_base = self.current_time
+
+        # Put 5 versions for the column
+        versions_to_put = []
+        for i in range(5):
+            # Put older versions first to ensure reverse-chronological retrieval test
+            ts = ts_base - (5 - 1 - i) * 10 # Timestamps: ts_base - 40, ts_base - 30, ..., ts_base
+            versions_to_put.append((col_name, f"value_{i+1}", ts))
+
+        # Ensure they are put in increasing timestamp order to match common use case
+        versions_to_put.sort(key=lambda item: item[2])
+
+        self.db.put_row(row_key, versions_to_put)
+
+        # Request only 3 versions
+        num_requested = 3
+        result = self.db.get_row(row_key, [col_name], num_versions=num_requested)
+
+        # Assert that exactly num_requested versions are returned
+        self.assertIn(col_name, result)
+        self.assertEqual(len(result[col_name]), num_requested)
+
+        # Assert that the returned versions are the latest ones
+        # The expected latest versions are the last N from the sorted list,
+        # formatted as (timestamp_ms, value) tuples.
+        expected_latest_versions = [(item[2], item[1]) for item in sorted(versions_to_put, key=lambda item: item[2], reverse=True)[:num_requested]]
+        # The result is also sorted newest first
+        retrieved_versions = result[col_name]
+
+        self.assertEqual(retrieved_versions, expected_latest_versions)
+
+        # Request only 1 version
+        num_requested_single = 1
+        result_single = self.db.get_row(row_key, [col_name], num_versions=num_requested_single)
+        self.assertIn(col_name, result_single)
+        self.assertEqual(len(result_single[col_name]), num_requested_single)
+        # The single requested version should be the very latest one, which is the first in our expected list
+        self.assertEqual(result_single[col_name][0], expected_latest_versions[0])
+
+
     def test_put_row_empty_items_list(self):
         row_key = "row_for_empty_put"
         self.db.put_row(row_key, []) # Put with an empty list of items
