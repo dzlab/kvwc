@@ -32,9 +32,9 @@ jobs:
           pip install bandit
           pip install safety
 
-      # - name: Run security scan with bandit
-      #   run: |
-      #     bandit -r . > bandit_report.txt
+      - name: Run security scan with bandit
+        run: |
+          bandit -r . > bandit_report.txt
 
       # - name: Run safety check
       #   run: |
