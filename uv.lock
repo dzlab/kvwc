@@ -7,11 +7,21 @@ name = "kvwc"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "msgpack-python" },
     { name = "rocksdict" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "rocksdict" }]
+requires-dist = [
+    { name = "msgpack-python", specifier = ">=0.5.6" },
+    { name = "rocksdict" },
+]
+
+[[package]]
+name = "msgpack-python"
+version = "0.5.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/20/6eca772d1a5830336f84aca1d8198e5a3f4715cd1c7fc36d3cc7f7185091/msgpack-python-0.5.6.tar.gz", hash = "sha256:378cc8a6d3545b532dfd149da715abae4fda2a3adb6d74e525d0d5e51f46909b", size = 138996, upload-time = "2018-03-10T09:22:56.493Z" }
 
 [[package]]
 name = "rocksdict"

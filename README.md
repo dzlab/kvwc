@@ -1,6 +1,6 @@
 # Key-Value Wide Column (KVWC) Database
 
-[![Build Status](https://github.com/dzlab/kvwc/actions/workflows/main.yml/badge.svg)](https://github.com/dzlab/kvwc/actions/workflows/main.yml)
+[![Build Status](https://github.com/dzlab/kvwc/actions/workflows/main.yml/badge.svg)](https://github.com/dzlab/kvwc/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/kvwc)](https://pypi.org/project/kvwc/)
 [![Supported Python versions](https://img.shields.io/pypi/pyversions/kvwc)](https://pypi.org/project/kvwc/)
 [![License](https://img.shields.io/github/license/dzlab/kvwc)](https://github.com/dzlab/kvwc/blob/main/LICENSE)

@@ -2,13 +2,23 @@ import logging
 import rocksdict as rocksdb
 import time
 from .key_codec import KeyCodec
+from .serializer import Serializer, StrSerializer # Import Serializer classes
 
 # Set the logging level
 logger = logging.getLogger(__name__)
 
 
 class WideColumnDB:
-    def __init__(self, db_path, key_codec=None):
+    def __init__(self, db_path, key_codec=None, serializer=None):
+        """
+        Initializes the WideColumnDB.
+
+        Args:
+            db_path (str): The path to the RocksDB database.
+            key_codec (KeyCodec, optional): The key codec to use. Defaults to KeyCodec().
+            serializer (Serializer, optional): The value serializer to use.
+                                              Defaults to StrSerializer().
+        """
         opts = rocksdb.Options()
         opts.create_if_missing(True)
         # For more advanced usage, you might explore Column Families here
@@ -19,9 +29,20 @@ class WideColumnDB:
         else:
             self.key_codec = key_codec
 
+        if serializer is None:
+            self.serializer = StrSerializer() # Default to StrSerializer
+        elif not isinstance(serializer, Serializer):
+             logger.warning("Provided serializer is not an instance of Serializer. Defaulting to StrSerializer.")
+             self.serializer = StrSerializer()
+        else:
+            self.serializer = serializer
+        logger.info(f"Using serializer: {type(self.serializer).__name__}")
+
+
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
 
+    # Removed _serialize_value and _deserialize_value as they are now handled by the Serializer class
 
     # --- Public API Methods ---
 
@@ -32,15 +53,22 @@ class WideColumnDB:
                (column_name, value) - current server time is used as timestamp.
                (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
-        batch = rocksdb.WriteBatch()
+        batch, count  = rocksdb.WriteBatch(), 0
         for item in items:
             column_name, value = item[0], item[1]
             timestamp_ms = item[2] if len(item) > 2 and item[2] is not None else self._current_timestamp_ms()
 
             rdb_key = self.key_codec.encode(dataset_name=dataset_name, row_key=row_key, column_name=column_name, timestamp_ms=timestamp_ms)
-            rdb_value = str(value).encode('utf-8') # Assuming value can be stringified
-            batch.put(rdb_key, rdb_value)
-        self.db.write(batch)
+            rdb_value = self.serializer.serialize(value) # Use the serializer instance
+            # Assuming serializer returns bytes or None on failure (or raises exception)
+            if rdb_value is not None:
+                 batch.put(rdb_key, rdb_value)
+                 count += 1
+            else:
+                 logger.warning(f"Serialization failed for value of type {type(value).__name__} for row '{row_key}', column '{column_name}'. Skipping item.")
+
+        if count > 0: # Only write if batch is not empty
+             self.db.write(batch)
 
     def get_row(self, row_key, column_names=None, num_versions=1, dataset_name=None, start_ts_ms=None, end_ts_ms=None):
         """
@@ -112,7 +140,7 @@ class WideColumnDB:
                 # Add the version if we haven't reached the version limit for this column
                 if len(results[current_col_name]) < num_versions:
                      if rdb_value_bytes is not None:
-                         results[current_col_name].append((current_ts_ms, rdb_value_bytes.decode('utf-8')))
+                         results[current_col_name].append((current_ts_ms, self.serializer.deserialize(rdb_value_bytes)))
                 # else: num_versions reached for this column, skip adding this version, but continue scanning
                 # the prefix in case there are other columns covered by this prefix (if it's a row prefix scan).
 
