@@ -30,6 +30,7 @@ if PROJECT_ROOT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_DIR)
 
 from src import WideColumnDB
+from src.key_codec import KeyCodec
 
 TEST_DB_PATH_BASE = "test_db_temp_wide_column_main"
 
@@ -485,7 +486,7 @@ class TestWideColumnDB(unittest.TestCase):
 
         # A key that might be too short if split by KEY_SEPARATOR
         # Manually craft a key that would lead to insufficient parts
-        raw_key_too_short = b"rowkey" + KEY_SEPARATOR + b"colname"
+        raw_key_too_short = b"rowkey" + KeyCodec.KEY_SEPARATOR + b"colname"
         # This key is missing the timestamp part
         self.db.db.put(raw_key_too_short, b"value")
 
@@ -509,7 +510,7 @@ class TestWideColumnDB(unittest.TestCase):
         self.assertEqual(res["colname_valid"][0], (self.current_time, "v"))
 
         # Test with dataset name expected but key is too short
-        raw_key_dataset_too_short = b"dataset" + KEY_SEPARATOR + b"row" + KEY_SEPARATOR + b"col"
+        raw_key_dataset_too_short = b"dataset" + KeyCodec.KEY_SEPARATOR + b"row" + KeyCodec.KEY_SEPARATOR + b"col"
         self.db.db.put(raw_key_dataset_too_short, b"value_ds_short")
         self.db.put_row("row", [("col_valid_ds", "val_ds", self.current_time)], dataset_name="dataset")
 
@@ -520,7 +521,7 @@ class TestWideColumnDB(unittest.TestCase):
         # Test with key that has incorrect timestamp bytes (not 8 bytes)
         # struct.error in _decode_key
         invalid_ts_bytes = b"short"
-        key_bad_ts = b"row_bad_ts" + KEY_SEPARATOR + b"col_bad_ts" + KEY_SEPARATOR + invalid_ts_bytes
+        key_bad_ts = b"row_bad_ts" + KeyCodec.KEY_SEPARATOR + b"col_bad_ts" + KeyCodec.KEY_SEPARATOR + invalid_ts_bytes
         self.db.db.put(key_bad_ts, b"value_bad_ts")
         self.db.put_row("row_bad_ts", [("col_good_ts", "val_good_ts", self.current_time)])
 
