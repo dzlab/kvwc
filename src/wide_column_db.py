@@ -139,7 +139,7 @@ class WideColumnDB:
                 # Add the version if we haven't reached the version limit for this column
                 if len(results[current_col_name]) < num_versions:
                      if rdb_value_bytes is not None:
-                         results[current_col_name].append((current_ts_ms, rdb_value_bytes.decode('utf-8')))
+                         results[current_col_name].append((current_ts_ms, self.serializer.deserialize(rdb_value_bytes)))
                 # else: num_versions reached for this column, skip adding this version, but continue scanning
                 # the prefix in case there are other columns covered by this prefix (if it's a row prefix scan).
 

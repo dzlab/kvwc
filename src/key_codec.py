@@ -1,11 +1,6 @@
 import struct
 import logging
 
-# Define a separator that's unlikely to appear in keys/column names
-KEY_SEPARATOR = b'\x00'
-# Assuming timestamps are uint64 (e.g., nanoseconds or milliseconds)
-MAX_UINT64 = 2**64 - 1
-
 class KeyCodec:
     """
     A class for encoding and decoding keys used in the WideColumnDB.

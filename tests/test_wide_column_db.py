@@ -29,7 +29,7 @@ PROJECT_ROOT_DIR = os.path.dirname(KVWC_DIR) # This is /
 if PROJECT_ROOT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_ROOT_DIR)
 
-from src import WideColumnDB, MAX_UINT64, KEY_SEPARATOR
+from src import WideColumnDB
 
 TEST_DB_PATH_BASE = "test_db_temp_wide_column_main"
 
