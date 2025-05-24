@@ -59,7 +59,7 @@ class WideColumnDB:
                (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
         if not self.db:
-            raise RuntimeError("Database is not initialized. Cannot perform get_row operation.")
+            raise RuntimeError("Database is not initialized. Cannot perform put_row operation.")
         batch, count  = rocksdb.WriteBatch(), 0
         for item in items:
             column_name, value = item[0], item[1]
