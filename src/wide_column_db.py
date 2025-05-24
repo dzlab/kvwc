@@ -53,7 +53,7 @@ class WideColumnDB:
                (column_name, value) - current server time is used as timestamp.
                (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
-        batch = rocksdb.WriteBatch()
+        batch, count  = rocksdb.WriteBatch(), 0
         for item in items:
             column_name, value = item[0], item[1]
             timestamp_ms = item[2] if len(item) > 2 and item[2] is not None else self._current_timestamp_ms()
@@ -63,10 +63,11 @@ class WideColumnDB:
             # Assuming serializer returns bytes or None on failure (or raises exception)
             if rdb_value is not None:
                  batch.put(rdb_key, rdb_value)
+                 count += 1
             else:
                  logger.warning(f"Serialization failed for value of type {type(value).__name__} for row '{row_key}', column '{column_name}'. Skipping item.")
 
-        if batch.count() > 0: # Only write if batch is not empty
+        if count > 0: # Only write if batch is not empty
              self.db.write(batch)
 
     def get_row(self, row_key, column_names=None, num_versions=1, dataset_name=None, start_ts_ms=None, end_ts_ms=None):
