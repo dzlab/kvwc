@@ -3,13 +3,14 @@ import rocksdict as rocksdb
 import time
 from .key_codec import KeyCodec
 from .serializer import Serializer, StrSerializer # Import Serializer classes
+from .db_manager import RocksDBManager # Import the new DB manager
 
 # Set the logging level
 logger = logging.getLogger(__name__)
 
 
 class WideColumnDB:
-    def __init__(self, db_path, key_codec=None, serializer=None):
+    def __init__(self, db_path, key_codec=None, serializer=None, rocksdb_options=None):
         """
         Initializes the WideColumnDB.
 
@@ -18,17 +19,17 @@ class WideColumnDB:
             key_codec (KeyCodec, optional): The key codec to use. Defaults to KeyCodec().
             serializer (Serializer, optional): The value serializer to use.
                                               Defaults to StrSerializer().
+            rocksdb_options (dict, optional): A dictionary of RocksDB options to apply.
+                                              Keys should correspond to settable options
+                                              (e.g., 'max_open_files'). Values are the
+                                              desired option values. Defaults to None.
         """
-        opts = rocksdb.Options()
-        opts.create_if_missing(True)
-        # For more advanced usage, you might explore Column Families here
-        # to represent different datasets/tables within the same DB.
-        try:
-            self.db = rocksdb.Rdict(db_path, opts)
-        except Exception as e:
-            logger.error(f"Failed to open RocksDB database at {db_path}: {e}")
-            # Depending on requirements, you might want to re-raise the exception
-            raise e
+        # Initialize the DB manager
+        self._db_manager = RocksDBManager(db_path, rocksdb_options=rocksdb_options)
+        # Open the database via the manager
+        self._db_manager.open_db() # This will raise an exception if it fails
+
+
         if key_codec is None:
             self.key_codec = KeyCodec()
         else:
@@ -58,7 +59,9 @@ class WideColumnDB:
                (column_name, value) - current server time is used as timestamp.
                (column_name, value, timestamp_ms) - the provided timestamp is used.
         """
-        if not self.db:
+        # Use the db instance from the manager
+        db_instance = self._db_manager.db
+        if db_instance is None:
             raise RuntimeError("Database is not initialized. Cannot perform put_row operation.")
         batch, count  = rocksdb.WriteBatch(), 0
         for item in items:
@@ -76,7 +79,7 @@ class WideColumnDB:
 
         if count > 0: # Only write if batch is not empty
             try:
-                 self.db.write(batch)
+                 db_instance.write(batch)
             except Exception as e:
                  logger.error(f"Error writing batch to database for row '{row_key}': {e}")
                  # Re-raise the exception to indicate failure
@@ -87,7 +90,9 @@ class WideColumnDB:
         Gets data for a row.
         Returns a dictionary: {column_name: [(timestamp_ms, value), ...]}
         """
-        if not self.db:
+        # Use the db instance from the manager
+        db_instance = self._db_manager.db
+        if db_instance is None:
             raise RuntimeError("Database is not initialized. Cannot perform get_row operation.")
         results = {}
 
@@ -117,7 +122,7 @@ class WideColumnDB:
         # Iterate through each prefix and use from_key to seek
         for prefix_bytes in scan_prefixes:
             # Use items(from_key=prefix_bytes) to seek to the start of the prefix range
-            for rdb_key, rdb_value_bytes in self.db.items(from_key=prefix_bytes):
+            for rdb_key, rdb_value_bytes in db_instance.items(from_key=prefix_bytes):
                 # Stop when the key no longer starts with the current prefix
                 if not rdb_key.startswith(prefix_bytes):
                     break # Exit the inner loop for this prefix
@@ -175,7 +180,9 @@ class WideColumnDB:
         If column_names is provided, deletes only those columns.
         If specific_timestamps_ms (list) is provided with a single column_name, deletes only those specific versions.
         """
-        if not self.db:
+        # Use the db instance from the manager
+        db_instance = self._db_manager.db
+        if db_instance is None:
             raise RuntimeError("Database is not initialized. Cannot perform delete_row operation.")
         batch, count = rocksdb.WriteBatch(), 0
 
@@ -187,9 +194,9 @@ class WideColumnDB:
                 rdb_key = self.key_codec.encode(dataset_name, row_key, single_col_name, ts_ms)
                 batch.delete(rdb_key)
                 count += 1
-            if self.db:
+            if db_instance: # Check if the instance is available
                 try:
-                    self.db.write(batch)
+                    db_instance.write(batch)
                 except Exception as e:
                     logger.error(f"Error writing batch for specific timestamp deletion for row '{row_key}', column '{single_col_name}': {e}")
                     # Re-raise the exception to indicate failure
@@ -213,7 +220,7 @@ class WideColumnDB:
         # Iterate through each prefix and use from_key to seek
         for prefix_bytes in scan_prefixes_for_delete:
             # Use items(from_key=prefix_bytes) to seek to the start of the prefix range
-            for rdb_key, _ in self.db.items(from_key=prefix_bytes):
+            for rdb_key, _ in db_instance.items(from_key=prefix_bytes):
                 # Stop when the key no longer starts with the current prefix
                 if not rdb_key.startswith(prefix_bytes):
                     break # Exit the inner loop for this prefix
@@ -221,13 +228,11 @@ class WideColumnDB:
                 batch.delete(rdb_key)
                 count += 1
         if count > 0: # Check if batch has operations
-             self.db.write(batch)
+             db_instance.write(batch)
 
     def close(self):
-        if self.db:
-            # In a real application, you might need to ensure all column family handles are closed if used.
-            # For a simple DB instance, this might be sufficient or just allow it to be GC'd.
-            # python-rocksdb's DB object doesn't have an explicit close method.
-            # Deleting the object or letting it go out of scope handles cleanup.
-            del self.db
-            self.db = None
+        """
+        Closes the database using the DB manager.
+        """
+        if self._db_manager:
+            self._db_manager.close_db()

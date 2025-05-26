@@ -375,7 +375,7 @@ class TestWideColumnDB(unittest.TestCase):
         temp_db.put_row("r1", [("c1", "v1", self.current_time)])
 
         temp_db.close()
-        self.assertIsNone(temp_db.db) # Internal RocksDB instance should be None
+        self.assertIsNone(temp_db._db_manager.db) # Internal RocksDB instance should be None
 
         with self.assertRaises(RuntimeError):
             temp_db.put_row("r2", [("c2", "v2", self.current_time + 1)])
@@ -535,7 +535,7 @@ class TestWideColumnDB(unittest.TestCase):
         # Manually craft a key that would lead to insufficient parts
         raw_key_too_short = b"rowkey" + KeyCodec.KEY_SEPARATOR + b"colname"
         # This key is missing the timestamp part
-        self.db.db.put(raw_key_too_short, b"value")
+        self.db._db_manager.db.put(raw_key_too_short, b"value")
 
         # When get_row scans, it should ideally skip this malformed key.
         # We put a valid key nearby to ensure scan continues.
@@ -558,7 +558,7 @@ class TestWideColumnDB(unittest.TestCase):
 
         # Test with dataset name expected but key is too short
         raw_key_dataset_too_short = b"dataset" + KeyCodec.KEY_SEPARATOR + b"row" + KeyCodec.KEY_SEPARATOR + b"col"
-        self.db.db.put(raw_key_dataset_too_short, b"value_ds_short")
+        self.db._db_manager.db.put(raw_key_dataset_too_short, b"value_ds_short")
         self.db.put_row("row", [("col_valid_ds", "val_ds", self.current_time)], dataset_name="dataset")
 
         res_ds = self.db.get_row("row", ["col_valid_ds"], dataset_name="dataset")
@@ -569,7 +569,7 @@ class TestWideColumnDB(unittest.TestCase):
         # struct.error in _decode_key
         invalid_ts_bytes = b"short"
         key_bad_ts = b"row_bad_ts" + KeyCodec.KEY_SEPARATOR + b"col_bad_ts" + KeyCodec.KEY_SEPARATOR + invalid_ts_bytes
-        self.db.db.put(key_bad_ts, b"value_bad_ts")
+        self.db._db_manager.db.put(key_bad_ts, b"value_bad_ts")
         self.db.put_row("row_bad_ts", [("col_good_ts", "val_good_ts", self.current_time)])
 
         res_bad_ts = self.db.get_row("row_bad_ts", ["col_good_ts"])
