@@ -124,7 +124,7 @@ user_data = db.get_row("user:123")
 # Example: {'email': [(current_ts_ms, 'alice@example.com')]}
 if "email" in user_data and user_data["email"]: # Check if data exists
     print(f"User email (default dataset): {user_data['email'][0][1]}")
-```
+
 
 
 # Get specific columns for a row (can be a list or a single string)
@@ -136,7 +136,7 @@ if "price" in product_info and product_info["price"]: # Check if data exists
 
 # Get multiple versions of a column from the default dataset
 price_history = db.get_row("product:abc", column_names="price", num_versions=2)
-```
+
 # Example: {'price': [(current_ts_ms, '21.99'), (current_ts_ms - 10000, '19.99')]}
 if "price" in price_history:
     print("Price history for product:abc:")
@@ -149,7 +149,7 @@ config_tenant_A = db.get_row("config:xyz", dataset_name="tenant_A")
 # Example: {'settingA': [(current_ts_ms, 'value1')]}
 if "settingA" in config_tenant_A and config_tenant_A["settingA"]: # Check if data exists
     print(f"Setting A for tenant_A dataset: {config_tenant_A['settingA'][0][1]}")
-
+```
 
 ### Time-Travel with `get_row`
 
@@ -213,6 +213,8 @@ if "event" in event_as_of_time and event_as_of_time["event"]:
 ```
 
 ### Deleting Data (`delete_row`)
+
+```python
 db.put_row("log:system", [("event", "start", current_ts_ms - 20000)])
 db.put_row("log:system", [("event", "process", current_ts_ms - 15000)])
 db.put_row("log:system", [("event", "checkpoint", current_ts_ms - 10000)])
