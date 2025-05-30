@@ -215,29 +215,6 @@ if "event" in event_as_of_time and event_as_of_time["event"]:
 ### Deleting Data (`delete_row`)
 
 ```python
-db.put_row("log:system", [("event", "start", current_ts_ms - 20000)])
-db.put_row("log:system", [("event", "process", current_ts_ms - 15000)])
-db.put_row("log:system", [("event", "checkpoint", current_ts_ms - 10000)])
-db.put_row("log:system", [("event", "stop", current_ts_ms - 5000)])
-
-events_in_range = db.get_row(
-    "log:system",
-    column_names="event",
-    start_ts_ms=current_ts_ms - 16000, # Includes 'process' (ts: current_ts_ms - 15000)
-    end_ts_ms=current_ts_ms - 9000,   # Includes 'checkpoint' (ts: current_ts_ms - 10000)
-    num_versions=10 # Get all versions within the range
-)
-# Example output (newest first):
-# {'event': [(<ts_for_checkpoint>, 'checkpoint'), (<ts_for_process>, 'process')]}
-if "event" in events_in_range:
-    print("System log events in specified time range:")
-    for ts, val in events_in_range["event"]:
-        print(f"  - {val} at {ts}")
-```
-
-### Deleting Data (`delete_row`)
-
-```python
 # Delete specific columns from a row (all versions of these columns)
 db.delete_row("product:abc", column_names=["description"]) # Assuming 'description' existed
 
@@ -279,7 +256,11 @@ try:
     db.get_row("user:123")
 except RuntimeError as e: # Expect RuntimeError now from DBManager access
     print(f"Error after close: {e}") # Example: Database is not initialized. Cannot get CF handle.
+```
 
+### Trying different Serializers
+
+```python
 # --- Example using a different Serializer ---
 # If you need to store non-string data (like numbers, lists, dicts, custom objects),
 # you can initialize WideColumnDB with a different serializer.
@@ -353,8 +334,6 @@ print(f"Closed database at {DB_PATH}")
 
 ## Internal Key Structure
 
-## Internal Key Structure
-
 KVWC leverages RocksDB's Column Family feature to handle datasets. The internal keys constructed by the configured `key_codec` within a specific Column Family (dataset) are structured to enable efficient prefix scans and ordered retrieval by timestamp *within that CF*.
 
 The general format of the key **within a Column Family** is:
@@ -378,17 +357,22 @@ This structure is an internal detail, but understanding it can be helpful for ad
 
 ## Running Tests
 
-The project includes a suite of unit tests in `kvwc/tests/test_wide_column_db.py`. To run the tests:
+The project includes a suite of unit tests under the `tests/` directory. To run the tests:
 
 1.  Ensure you have installed the `kvwc` package and its dependencies (as described in the Installation section).
 2.  Navigate to the root directory of the project.
-3.  Run the tests using Python's `unittest` module:
+3.  Activate the python virtual enviroment
+    ```bash
+    source .venv/bin/activate
+    ```
+4.  Run the tests using Python's `unittest` module:
 
     ```bash
-    python -m unittest kvwc.tests.test_wide_column_db
+    python -m unittest discover tests
     ```
-    Alternatively, if your current working directory is the project root:
+    or running a specific test file
     ```bash
-    python kvwc/tests/test_wide_column_db.py
+    python -m unittest tests.test_wide_column_db
     ```
+
     The tests create and remove temporary database files in a `test_db_temp_wide_column_main` directory within the current working directory where the test script is run.
