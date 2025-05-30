@@ -213,8 +213,9 @@ class TestWideColumnDB(unittest.TestCase):
 
         # Get from dataset1 within a time range (inclusive)
         # Range: ts_middle to ts_latest
+        # Explicitly set num_versions high to allow time range to filter
         result = self.db.get_row(row_key, column_names=col_name, dataset_name=dataset_name,
-                                start_ts_ms=ts_middle, end_ts_ms=ts_latest)
+                                start_ts_ms=ts_middle, end_ts_ms=ts_latest, num_versions=4)
 
         self.assertIn(col_name, result)
         self.assertEqual(len(result[col_name]), 3)
@@ -224,24 +225,27 @@ class TestWideColumnDB(unittest.TestCase):
         self.assertEqual(result[col_name][2], (ts_middle, "middle"))
 
         # Get from dataset1 with only start time
+        # Explicitly set num_versions high to allow time range to filter
         result_start_only = self.db.get_row(row_key, column_names=col_name, dataset_name=dataset_name,
-                                            start_ts_ms=ts_late)
+                                            start_ts_ms=ts_late, num_versions=4)
         self.assertIn(col_name, result_start_only)
         self.assertEqual(len(result_start_only[col_name]), 2)
         self.assertEqual(result_start_only[col_name][0], (ts_latest, "latest"))
         self.assertEqual(result_start_only[col_name][1], (ts_late, "late"))
 
         # Get from dataset1 with only end time
+        # Explicitly set num_versions high to allow time range to filter
         result_end_only = self.db.get_row(row_key, column_names=col_name, dataset_name=dataset_name,
-                                          end_ts_ms=ts_middle)
+                                          end_ts_ms=ts_middle, num_versions=4)
         self.assertIn(col_name, result_end_only)
         self.assertEqual(len(result_end_only[col_name]), 2)
         self.assertEqual(result_end_only[col_name][0], (ts_middle, "middle")) # Newest first in range
         self.assertEqual(result_end_only[col_name][1], (ts_early, "early"))
 
         # Get from default CF with same time range - should only get default values
+        # Explicitly set num_versions high to allow time range to filter
         result_default_range = self.db.get_row(row_key, column_names=col_name, dataset_name=None,
-                                                start_ts_ms=ts_middle, end_ts_ms=ts_latest)
+                                                start_ts_ms=ts_middle, end_ts_ms=ts_latest, num_versions=4)
         # Default CF only had ts_latest in this range
         self.assertIn(col_name, result_default_range)
         self.assertEqual(len(result_default_range[col_name]), 1)
