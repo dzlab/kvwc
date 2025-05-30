@@ -4,6 +4,7 @@ import time
 from .key_codec import KeyCodec # Keep KeyCodec for now, will modify
 from .serializer import Serializer, StrSerializer # Import Serializer classes
 from .db_manager import RocksDBManager # Import the new DB manager
+from src import db_manager
 
 # Set the logging level
 logger = logging.getLogger(__name__)
@@ -26,16 +27,15 @@ class WideColumnDB:
                                              These will correspond to dataset_names. Defaults to None.
                                              The 'default' CF is always opened.
         """
-        # Initialize the DB manager with provided column families
-        self._db_manager = RocksDBManager(db_path, rocksdb_options=rocksdb_options, column_families=column_families)
-        # Open the database via the manager
-        self._db_manager.open_db() # This will raise an exception if it fails
-
         # Store the list of known column families for validation/reference
         # The DB manager ensures 'default' is always included
         self._known_column_families = ['default'] + (column_families if column_families is not None else [])
         # Remove duplicates just in case 'default' was explicitly passed
         self._known_column_families = list(set(self._known_column_families))
+        # Initialize the DB manager with provided column families
+        self._db_manager = RocksDBManager(db_path, rocksdb_options=rocksdb_options, column_families=self._known_column_families)
+        # Open the database via the manager
+        self._db_manager.open_db() # This will raise an exception if it fails
 
 
         if key_codec is None:
@@ -57,36 +57,6 @@ class WideColumnDB:
     def _current_timestamp_ms(self):
         return int(time.time() * 1000)
 
-    def _get_cf_handle(self, dataset_name):
-        """
-        Gets the rocksdict handle for the specified dataset_name (Column Family).
-        Uses 'default' CF if dataset_name is None or not provided.
-        Raises an error if the dataset_name corresponds to a CF that wasn't opened.
-        """
-        cf_name = dataset_name if dataset_name is not None else 'default'
-        if cf_name not in self._known_column_families:
-             # This check prevents using CFs that weren't specified during init.
-             # RocksDB might implicitly create them anyway depending on version/options,
-             # but requiring them to be listed in init makes the CFs explicit.
-             # Alternatively, we could allow implicit creation here, but being explicit
-             # is generally better for managing CFs.
-             logger.warning(f"Attempted to access unknown Column Family: {cf_name}. Was it included in column_families during initialization?")
-             # Decide whether to raise error or default to 'default'/'None' CF.
-             # For now, let's raise an error to enforce explicit CF listing.
-             raise ValueError(f"Column Family '{cf_name}' is not known. Please include it in the 'column_families' list when initializing WideColumnDB.")
-
-        db_instance = self._db_manager.db
-        if db_instance is None:
-            raise RuntimeError("Database is not initialized. Cannot get CF handle.")
-
-        # Access the CF handle using dictionary-like access
-        try:
-            return db_instance[cf_name]
-        except KeyError:
-             # This should ideally not happen if _known_column_families is correct and DB opened successfully
-             logger.error(f"Failed to get handle for Column Family '{cf_name}'. It might not have been opened correctly.")
-             raise
-
     # --- Public API Methods ---
 
     def put_row(self, row_key, items, dataset_name=None):
@@ -98,7 +68,7 @@ class WideColumnDB:
         dataset_name: The name of the dataset (Column Family) to use. Defaults to 'default'.
         """
         # Get the correct CF handle
-        cf_handle = self._get_cf_handle(dataset_name)
+        cf_handle = self._db_manager.get_cf_handle(dataset_name)
 
         batch, count  = rocksdb.WriteBatch(), 0
         for item in items:
@@ -139,7 +109,7 @@ class WideColumnDB:
         dataset_name: The name of the dataset (Column Family) to use. Defaults to 'default'.
         """
         # Get the correct CF handle
-        cf_handle = self._get_cf_handle(dataset_name)
+        cf_handle = self._db_manager.get_cf(dataset_name)
 
         results = {}
 
@@ -250,7 +220,7 @@ class WideColumnDB:
         dataset_name: The name of the dataset (Column Family) to use. Defaults to 'default'.
         """
         # Get the correct CF handle
-        cf_handle = self._get_cf_handle(dataset_name)
+        cf, cf_handle = self._db_manager.get_cf(dataset_name), self._db_manager.get_cf_handle(dataset_name)
 
         batch, count = rocksdb.WriteBatch(), 0
 
@@ -306,7 +276,7 @@ class WideColumnDB:
         # Iterate through each prefix on the specific CF handle and use from_key to seek
         for prefix_bytes in valid_scan_prefixes:
             # Use items(from_key=prefix_bytes) on the CF handle
-            for rdb_key, _ in cf_handle.items(from_key=prefix_bytes):
+            for rdb_key, _ in cf.items(from_key=prefix_bytes):
                 # Stop when the key no longer starts with the current prefix
                 if not rdb_key.startswith(prefix_bytes):
                     break # Exit the inner loop for this prefix

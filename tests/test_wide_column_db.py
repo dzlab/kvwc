@@ -736,7 +736,7 @@ class TestWideColumnDB(unittest.TestCase):
         valid_value = self.db.serializer.serialize("valid_value")
 
         # Get the CF handle
-        cf_handle = self.db._get_cf_handle(dataset_name)
+        cf_handle = self.db._db_manager.get_cf_handle(dataset_name)
 
         # Manually put a malformed key into the specific CF using the underlying rocksdict handle
         # This bypasses the WideColumnDB's put_row which would use the codec.
@@ -791,13 +791,10 @@ class TestWideColumnDB(unittest.TestCase):
         # This is implicitly tested by the assertion above.
 
 
-    def test_different_serializers_specific_cf(self):
-        """Test different serializers with put/get in a specific CF."""
+    def test_str_serializers_specific_cf(self):
+        """Test str serializers with put/get in a specific CF."""
         db_path = "test_db_serializers_cf"
         dataset_name = "serializer_cf"
-        # Clean up previous test run
-        if os.path.exists(db_path):
-            shutil.rmtree(db_path)
 
         # Test StrSerializer (already implicitly tested, but explicitly call it out)
         db_str = WideColumnDB(db_path, serializer=StrSerializer(), column_families=[dataset_name])
@@ -805,7 +802,12 @@ class TestWideColumnDB(unittest.TestCase):
         result_str = db_str.get_row("row_str", dataset_name=dataset_name)
         self.assertEqual(result_str.get("col_str", [])[0][1], "simple string")
         db_str.close()
+        rocksdb.Rdict.destroy(db_path)
 
+    def test_pickle_serializers_specific_cf(self):
+        """Test pickle serializers with put/get in a specific CF."""
+        db_path = "test_db_serializers_cf"
+        dataset_name = "serializer_cf"
 
         # Test PickleSerializer
         db_pickle = WideColumnDB(db_path, serializer=PickleSerializer(), column_families=[dataset_name])
@@ -814,6 +816,12 @@ class TestWideColumnDB(unittest.TestCase):
         result_pickle = db_pickle.get_row("row_pickle", dataset_name=dataset_name)
         self.assertEqual(result_pickle.get("col_pickle", [])[0][1], data_pickle)
         db_pickle.close()
+        rocksdb.Rdict.destroy(db_path)
+
+    def test_json_serializers_specific_cf(self):
+        """Test json serializers with put/get in a specific CF."""
+        db_path = "test_db_serializers_cf"
+        dataset_name = "serializer_cf"
 
         # Test JsonSerializer
         db_json = WideColumnDB(db_path, serializer=JsonSerializer(), column_families=[dataset_name])
@@ -822,7 +830,12 @@ class TestWideColumnDB(unittest.TestCase):
         result_json = db_json.get_row("row_json", dataset_name=dataset_name)
         self.assertEqual(result_json.get("col_json", [])[0][1], data_json)
         db_json.close()
+        rocksdb.Rdict.destroy(db_path)
 
+    def test_msgpack_serializers_specific_cf(self):
+        """Test msgpack serializers with put/get in a specific CF."""
+        db_path = "test_db_serializers_cf"
+        dataset_name = "serializer_cf"
 
         # Test MsgPackSerializer
         db_msgpack = WideColumnDB(db_path, serializer=MsgPackSerializer(), column_families=[dataset_name])
@@ -831,14 +844,10 @@ class TestWideColumnDB(unittest.TestCase):
         result_msgpack = db_msgpack.get_row("row_msgpack", dataset_name=dataset_name)
         # Note: msgpack unpackb with raw=False decodes binary to str, adjust expected if necessary
         # Assuming raw=False gives str where possible:
-        expected_msgpack_data = {"key": "binary_value", "number": 123, "list": [1, 2, 3]}
+        expected_msgpack_data = {"key": b"binary_value", "number": 123, "list": [1, 2, 3]}
         self.assertEqual(result_msgpack.get("col_msgpack", [])[0][1], expected_msgpack_data)
         db_msgpack.close()
-
-
-        # Clean up the temp directory
-        if os.path.exists(db_path):
-            shutil.rmtree(db_path)
+        rocksdb.Rdict.destroy(db_path)
 
 
     # Add a test for initializing WideColumnDB without specifying column_families (should use default)

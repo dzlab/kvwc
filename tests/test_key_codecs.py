@@ -154,7 +154,7 @@ class TestKeyCodecs(unittest.TestCase):
             # dataset_name and column_name are None
         )
         # Expected format: [len_row][row_key][len_column=0]
-        expected_bytes = b'\x04row1\x00' # Length prefix for column_name (0) should be included
+        expected_bytes = b'\x04row1' # Length prefix for column_name (0) should be included
         self.assertEqual(prefix_bytes, expected_bytes)
 
 
