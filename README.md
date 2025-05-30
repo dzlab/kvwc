@@ -18,7 +18,7 @@ KVWC is a Python library that implements a key-value wide-column data store, lev
     *   `get_row`: Retrieve data for a row, with options to filter by columns, number of versions, and time range.
     *   `delete_row`: Delete entire rows, specific columns within a row, or specific timestamped versions of a column.
 *   **Persistent Storage:** Uses RocksDB for durable, on-disk storage.
-*   **UTF-8 Encoding:** Keys and values are stored as UTF-8 encoded strings.
+*   **Value Serializability:** Values can be any Python object that can be serialized into bytes. A default UTF-8 string serializer is provided, but you can plug in other serializers (e.g., Pickle, JSON, MsgPack).
 
 ## Core Concepts
 
@@ -27,8 +27,8 @@ The KVWC data model is based on a few key components:
 *   **Row Key:** A unique string identifier for a row. This is the primary way to group related data.
 *   **Column Name:** A string identifier for a specific piece of data within a row. A row can have many columns.
 *   **Timestamp (ms):** A 64-bit integer representing milliseconds since the epoch. Each value stored for a (row key, column name) pair is associated with a timestamp. This enables versioning, with data typically sorted in reverse chronological order (newest first). If no timestamp is provided during a `put_row` operation, the current server time is used.
-*   **Value:** The actual data, stored as a string.
-*   **Dataset (Optional):** An optional string name that acts as a namespace. If a dataset is specified, the row key is unique within that dataset. This allows, for example, different datasets to have rows with the same `row_key` without collision.
+*   **Value:** The actual data, stored as bytes after serialization from a Python object. The library supports various serializers.
+*   **Dataset (Optional):** An optional string name that maps directly to a RocksDB Column Family (CF). This provides strong isolation between datasets. Data within one dataset (CF) is separate from data in others, even if row keys are the same. If no dataset name is provided during operations, the `default` Column Family is used. Datasets (Column Families) must be specified during the `WideColumnDB` initialization.
 
 ## Installation
 
@@ -62,14 +62,35 @@ The project uses `pyproject.toml` for its build and dependency management.
 First, import the `WideColumnDB` class:
 
 ```python
-from kvwc import WideColumnDB
+from kvwc import WideColumnDB, PickleSerializer, JsonSerializer, MsgPackSerializer
 import time
+import os # For cleaning up test databases
 
-# Initialize the database (creates files at the specified path if they don't exist)
-db = WideColumnDB("./my_kvwc_database")
+# Define database path
+DB_PATH = "./my_kvwc_database"
+
+# Clean up previous test runs if necessary
+if os.path.exists(DB_PATH):
+    # This is a simplified cleanup, in a real app manage lifecycle carefully
+    import shutil
+    shutil.rmtree(DB_PATH)
+    print(f"Cleaned up existing database at {DB_PATH}")
+
+
+# Initialize the database
+# You must specify the column_families (datasets) you plan to use.
+# The 'default' CF is always available even if not listed.
+db = WideColumnDB(
+    DB_PATH,
+    column_families=["users", "products", "configs", "logs", "sensors", "tenant_A", "tenant_B"],
+    # Optionally specify RocksDB options (e.g., increase number of open files)
+    # rocksdb_options={"max_open_files": 1000}
+)
 
 # Helper for timestamps in examples
 current_ts_ms = int(time.time() * 1000)
+
+print(f"Initialized database at {DB_PATH}")
 ```
 
 ### Putting Data (`put_row`)
@@ -90,7 +111,7 @@ db.put_row("product:abc", [
 
 # Using a dataset
 db.put_row("config:xyz", [("settingA", "value1", current_ts_ms)], dataset_name="tenant_A")
-db.put_row("config:xyz", [("settingA", "value2", current_ts_ms)], dataset_name="tenant_B") # Same key, different dataset
+db.put_row("config:xyz", [("settingA", "value2", current_ts_ms)], dataset_name="tenant_B") # Same key, different dataset in different CFs
 ```
 
 ### Getting Data (`get_row`)
@@ -98,22 +119,24 @@ db.put_row("config:xyz", [("settingA", "value2", current_ts_ms)], dataset_name="
 The `get_row` method retrieves data. It returns a dictionary where keys are column names and values are lists of `(timestamp_ms, value)` tuples, sorted newest first.
 
 ```python
-# Get all columns for a row (latest version of each)
+# Get all columns for a row (latest version of each) from the default dataset
 user_data = db.get_row("user:123")
 # Example: {'email': [(current_ts_ms, 'alice@example.com')]}
-if "email" in user_data:
-    print(f"User email: {user_data['email'][0][1]}")
+if "email" in user_data and user_data["email"]: # Check if data exists
+    print(f"User email (default dataset): {user_data['email'][0][1]}")
+```
 
 
 # Get specific columns for a row (can be a list or a single string)
 product_info = db.get_row("product:abc", column_names=["name", "price"])
 # Example: {'name': [(<ts_for_name>, 'Super Widget')], 'price': [(current_ts_ms, '21.99')]}
-if "price" in product_info:
-    print(f"Latest product price: {product_info['price'][0][1]}")
+if "price" in product_info and product_info["price"]: # Check if data exists
+    print(f"Latest product price (default dataset): {product_info['price'][0][1]}")
 
 
-# Get multiple versions of a column
+# Get multiple versions of a column from the default dataset
 price_history = db.get_row("product:abc", column_names="price", num_versions=2)
+```
 # Example: {'price': [(current_ts_ms, '21.99'), (current_ts_ms - 10000, '19.99')]}
 if "price" in price_history:
     print("Price history for product:abc:")
@@ -124,12 +147,72 @@ if "price" in price_history:
 # Get data from a specific dataset
 config_tenant_A = db.get_row("config:xyz", dataset_name="tenant_A")
 # Example: {'settingA': [(current_ts_ms, 'value1')]}
-if "settingA" in config_tenant_A:
-    print(f"Setting A for tenant_A: {config_tenant_A['settingA'][0][1]}")
+if "settingA" in config_tenant_A and config_tenant_A["settingA"]: # Check if data exists
+    print(f"Setting A for tenant_A dataset: {config_tenant_A['settingA'][0][1]}")
 
 
+### Time-Travel with `get_row`
+
+The timestamping and versioning allow you to retrieve data as it existed at previous points in time or within specific time windows. The `get_row` method's `start_ts_ms`, `end_ts_ms`, and `num_versions` parameters enable this "time-travel" capability.
+
+*   `num_versions`: Retrieve the N most recent versions. `num_versions=1` gets only the latest.
+*   `start_ts_ms` / `end_ts_ms`: Retrieve versions whose timestamps fall within the specified range (inclusive). If both are used, versions must be within the range. If only `start_ts_ms` is used, it gets versions newer than or equal to that time. If only `end_ts_ms` is used, it gets versions older than or equal to that time.
+
+When using `start_ts_ms` or `end_ts_ms`, `num_versions` acts as an *additional* limit on the number of results returned *within* that time window. If `num_versions` is larger than the actual number of versions in the range, all versions in the range are returned. To get *all* versions in a time range, set `num_versions` to a large value (e.g., 1000 or more).
+
+Here's an example demonstrating time range retrieval:
+
+```python
 # Get data within a time range
-# Let's add some data points for this example:
+# Let's add some data points for this example in the 'logs' dataset:
+db.put_row("log:system", [("event", "start", current_ts_ms - 20000)], dataset_name="logs")
+db.put_row("log:system", [("event", "process", current_ts_ms - 15000)], dataset_name="logs")
+db.put_row("log:system", [("event", "checkpoint", current_ts_ms - 10000)], dataset_name="logs")
+db.put_row("log:system", [("event", "stop", current_ts_ms - 5000)], dataset_name="logs")
+
+events_in_range = db.get_row(
+    "log:system",
+    column_names="event",
+    dataset_name="logs", # Specify the dataset
+    start_ts_ms=current_ts_ms - 16000, # Includes 'process' (ts: current_ts_ms - 15000)
+    end_ts_ms=current_ts_ms - 9000,   # Includes 'checkpoint' (ts: current_ts_ms - 10000)
+    num_versions=10 # Get all versions within the range (assuming less than 10)
+)
+# Example output (newest first):
+# {'event': [(<ts_for_checkpoint>, 'checkpoint'), (<ts_for_process>, 'process')]}
+if "event" in events_in_range and events_in_range["event"]: # Check if data exists
+    print("System log events in specified time range (logs dataset):")
+    for ts, val in events_in_range["event"]:
+        print(f"  - {val} at {ts}")
+
+# Example: Get the value of 'event' column in 'log:system' row *at* the time just after 'process'
+event_at_time = db.get_row(
+    "log:system",
+    column_names="event",
+    dataset_name="logs",
+    start_ts_ms=current_ts_ms - 15000,
+    num_versions=1 # Get the single most recent version at or after this time
+)
+if "event" in event_at_time and event_at_time["event"]:
+     # This will return the 'process' event because it's the newest at or after the start_ts_ms
+     print(f"Event at or after {current_ts_ms - 15000}: {event_at_time['event'][0][1]} (ts: {event_at_time['event'][0][0]})")
+
+# Example: Get the value of 'event' column in 'log:system' row *as it was* at the time just before 'checkpoint'
+# By setting end_ts_ms and num_versions=1, we get the newest version whose timestamp is <= end_ts_ms
+event_as_of_time = db.get_row(
+    "log:system",
+    column_names="event",
+    dataset_name="logs",
+    end_ts_ms=current_ts_ms - 10001, # Just before checkpoint timestamp
+    num_versions=1
+)
+if "event" in event_as_of_time and event_as_of_time["event"]:
+     # This will return the 'process' event because it's the newest version whose timestamp is <= 10001ms before now
+     print(f"Event as of {current_ts_ms - 10001}: {event_as_of_time['event'][0][1]} (ts: {event_as_of_time['event'][0][0]})")
+
+```
+
+### Deleting Data (`delete_row`)
 db.put_row("log:system", [("event", "start", current_ts_ms - 20000)])
 db.put_row("log:system", [("event", "process", current_ts_ms - 15000)])
 db.put_row("log:system", [("event", "checkpoint", current_ts_ms - 10000)])
@@ -175,7 +258,7 @@ db.delete_row("sensor:t1", column_names="reading", specific_timestamps_ms=[ts2])
 data = db.get_row("sensor:t1", column_names="reading", num_versions=3)
 # Example: {'reading': [(ts3, '22C'), (ts1, '20C')]}
 print("Sensor t1 readings after deleting middle version:")
-if "reading" in data:
+if "reading" in data and data["reading"]: # Check if data exists
     for ts, val in data["reading"]:
         print(f"  - {val} at {ts}")
 ```
@@ -187,24 +270,107 @@ if "reading" in data:
 # This releases resources held by RocksDB.
 db.close()
 
+print(f"Closed database at {DB_PATH}")
+
 # After closing, db.db will be None, and further operations on this instance will fail.
-# try:
-#     db.get_row("user:123")
-# except AttributeError as e:
-#     print(f"Error after close: {e}") # Example: 'NoneType' object has no attribute 'iterkeys'
+try:
+    db.get_row("user:123")
+except RuntimeError as e: # Expect RuntimeError now from DBManager access
+    print(f"Error after close: {e}") # Example: Database is not initialized. Cannot get CF handle.
+
+# --- Example using a different Serializer ---
+# If you need to store non-string data (like numbers, lists, dicts, custom objects),
+# you can initialize WideColumnDB with a different serializer.
+
+# Clean up the previous database
+if os.path.exists(DB_PATH):
+    import shutil
+    shutil.rmtree(DB_PATH)
+    print(f"Cleaned up existing database at {DB_PATH}")
+
+# Initialize with PickleSerializer (can serialize most Python objects)
+# Remember to specify all CFs you intend to use
+db_pickle = WideColumnDB(
+    DB_PATH,
+    column_families=["data_pickle"],
+    serializer=PickleSerializer()
+)
+
+# Store a dictionary
+complex_data = {"value": 123, "status": True, "tags": ["a", "b"]}
+db_pickle.put_row("complex:data", [("details", complex_data)], dataset_name="data_pickle")
+
+# Retrieve and deserialize it
+retrieved_data = db_pickle.get_row("complex:data", dataset_name="data_pickle")
+
+if "details" in retrieved_data and retrieved_data["details"]:
+    timestamp, value = retrieved_data["details"][0]
+    print(f"Retrieved complex data (PickleSerializer): {value} (type: {type(value)})")
+    # Output: Retrieved complex data (PickleSerializer): {'value': 123, 'status': True, 'tags': ['a', 'b']} (type: <class 'dict'>)
+
+# Close the database instance
+db_pickle.close()
+print(f"Closed database at {DB_PATH}")
+
+
+# --- Example using JsonSerializer ---
+# Note: JsonSerializer only works with JSON-serializable types.
+
+# Clean up the previous database
+if os.path.exists(DB_PATH):
+    import shutil
+    shutil.rmtree(DB_PATH)
+    print(f"Cleaned up existing database at {DB_PATH}")
+
+# Initialize with JsonSerializer
+db_json = WideColumnDB(
+    DB_PATH,
+    column_families=["data_json"],
+    serializer=JsonSerializer()
+)
+
+# Store a list
+json_serializable_data = [1, "two", {"three": 4}]
+db_json.put_row("json:data", [("list_data", json_serializable_data)], dataset_name="data_json")
+
+# Retrieve and deserialize it
+retrieved_json_data = db_json.get_row("json:data", dataset_name="data_json")
+
+if "list_data" in retrieved_json_data and retrieved_json_data["list_data"]:
+    timestamp, value = retrieved_json_data["list_data"][0]
+    print(f"Retrieved JSON data (JsonSerializer): {value} (type: {type(value)})")
+    # Output: Retrieved JSON data (JsonSerializer): [1, 'two', {'three': 4}] (type: <class 'list'>)
+
+# Close the database instance
+db_json.close()
+print(f"Closed database at {DB_PATH}")
+
+
+# MsgPackSerializer is another efficient option, especially for binary data or performance-sensitive cases.
 ```
 
 ## Internal Key Structure
 
-KVWC constructs internal keys for RocksDB in a way that enables efficient prefix scans and ordered retrieval by timestamp. The general format is:
+## Internal Key Structure
 
-`[dataset_name_bytes <SEP>] row_key_bytes <SEP> column_name_bytes <SEP> inverted_timestamp_bytes`
+KVWC leverages RocksDB's Column Family feature to handle datasets. The internal keys constructed by the configured `key_codec` within a specific Column Family (dataset) are structured to enable efficient prefix scans and ordered retrieval by timestamp *within that CF*.
+
+The general format of the key **within a Column Family** is:
+
+`row_key_bytes <SEP> column_name_bytes <SEP> inverted_timestamp_bytes`
+
+Or, for the `LengthPrefixedKeyCodec`:
+
+`[len_row][row_key][len_column][column_name][inverted_timestamp_ms]`
 
 Where:
-*   `<SEP>` is a null byte (`\x00`).
-*   `dataset_name_bytes` is present only if a dataset is used for the operation.
-*   `row_key_bytes`, `column_name_bytes` are UTF-8 encoded strings.
+*   `<SEP>` is a null byte (`\x00`) used by the default `KeyCodec`.
+*   `row_key_bytes`, `column_name_bytes` are the byte representations of the row and column names (e.g., UTF-8 encoded for the default codec, or length-prefixed bytes for `LengthPrefixedKeyCodec`).
 *   `inverted_timestamp_bytes` is a big-endian 8-byte representation of `(2^64 - 1) - timestamp_ms`. Inverting the timestamp allows RocksDB's default lexicographical sorting (byte-wise) to naturally order keys from newest to oldest timestamp.
+
+**Note:** The dataset name is implicitly handled by using the correct RocksDB Column Family handle for each operation; it is *not* part of the key byte string stored within that CF.
+
+This structure is an internal detail, but understanding it can be helpful for advanced use cases or debugging. The choice of `key_codec` (e.g., `KeyCodec` or `LengthPrefixedKeyCodec`) affects the exact byte format.
 
 This structure is an internal detail, but understanding it can be helpful for advanced use cases or debugging.
 
@@ -223,4 +389,4 @@ The project includes a suite of unit tests in `kvwc/tests/test_wide_column_db.py
     ```bash
     python kvwc/tests/test_wide_column_db.py
     ```
-    The tests create and remove temporary database files in a `test_db_temp_wide_column_main` directory in the location where the test script is run.
+    The tests create and remove temporary database files in a `test_db_temp_wide_column_main` directory within the current working directory where the test script is run.
