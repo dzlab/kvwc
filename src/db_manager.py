@@ -5,10 +5,10 @@ logger = logging.getLogger(__name__)
 
 class RocksDBManager:
     """
-    Manages the lifecycle of a RocksDB database instance.
+    Manages the lifecycle of a RocksDB database instance with support for Column Families.
     Handles opening, closing, and applying RocksDB options.
     """
-    def __init__(self, db_path, rocksdb_options=None):
+    def __init__(self, db_path, rocksdb_options=None, column_families=None):
         """
         Initializes the RocksDBManager.
 
@@ -18,30 +18,35 @@ class RocksDBManager:
                                               Keys should correspond to settable options
                                               (e.g., 'max_open_files'). Values are the
                                               desired option values. Defaults to None.
+            column_families (list, optional): A list of Column Family names (strings) to open/create.
+                                             Defaults to None, meaning only the 'default' CF is used.
         """
         self._db_path = db_path
         self._rocksdb_options = rocksdb_options
+        self._column_families = column_families if column_families is not None else [] # Store requested CFs
         self._db = None # Holds the RocksDB instance
 
     def open_db(self):
         """
-        Opens the RocksDB database instance.
+        Opens the RocksDB database instance with specified Column Families.
 
-        Applies the specified options and creates the database if it doesn't exist.
-        Stores the opened database instance internally.
+        Applies the specified options and creates the database and Column Families
+        if they don't exist. Stores the opened database instance internally.
 
         Returns:
-            rocksdict.Rdict: The opened RocksDB database instance.
+            rocksdict.Rdict: The opened RocksDB database instance, which can be
+                             indexed by CF name (including 'default').
 
         Raises:
-            Exception: If there is an error opening the database.
+            Exception: If there is an error opening the database or creating CFs.
         """
         if self._db is not None:
             logger.warning(f"Database at {self._db_path} is already open.")
             return self._db
 
         opts = rocksdb.Options()
-        opts.create_if_missing(True) # Set default option
+        opts.create_if_missing(True)
+        opts.create_missing_column_families(True) # Enable creating missing CFs
 
         # Apply provided options
         if self._rocksdb_options is not None:
@@ -69,9 +74,16 @@ class RocksDBManager:
                     else:
                         logger.warning(f"Unknown or unsettable RocksDB option ignored: {key}")
 
+        # Always include the 'default' CF when opening
+        all_cfs_to_open = list(set(['default'] + self._column_families))
+
         try:
-            self._db = rocksdb.Rdict(self._db_path, opts)
-            logger.info(f"Successfully opened RocksDB database at {self._db_path}")
+            # Open with multiple column families
+            cols = {}
+            for colname in all_cfs_to_open:
+                cols[colname] = rocksdb.Options()
+            self._db = rocksdb.Rdict(self._db_path, opts, column_families=cols)
+            logger.info(f"Successfully opened RocksDB database at {self._db_path} with CFs: {all_cfs_to_open}")
             return self._db
         except Exception as e:
             logger.error(f"Failed to open RocksDB database at {self._db_path}: {e}")
@@ -86,19 +98,72 @@ class RocksDBManager:
             logger.info(f"Closing RocksDB database at {self._db_path}")
             # The rocksdict object does not have an explicit close method.
             # Deleting the object triggers the underlying C++ cleanup.
+            # If there are CF handles, they are also managed by the Rdict instance.
             del self._db
             self._db = None
         else:
             logger.warning(f"Database at {self._db_path} is not open. Cannot close.")
+
+
+    def _validate_dataset(self, dataset_name) -> rocksdb.Rdict:
+        """
+        Gets the rocksdict handle for the specified dataset_name (Column Family).
+        Uses 'default' CF if dataset_name is None or not provided.
+        Raises an error if the dataset_name corresponds to a CF that wasn't opened.
+        """
+        cf_name = dataset_name if dataset_name is not None else 'default'
+        if cf_name not in self._column_families:
+            # This check prevents using CFs that weren't specified during init.
+            # RocksDB might implicitly create them anyway depending on version/options,
+            # but requiring them to be listed in init makes the CFs explicit.
+            # Alternatively, we could allow implicit creation here, but being explicit
+            # is generally better for managing CFs.
+            logger.warning(f"Attempted to access unknown Column Family: {cf_name}. Was it included in column_families during initialization?")
+            # Decide whether to raise error or default to 'default'/'None' CF.
+            # For now, let's raise an error to enforce explicit CF listing.
+            raise ValueError(f"Column Family '{cf_name}' is not known. Please include it in the 'column_families' list when initializing WideColumnDB.")
+        return cf_name
+
+    def get_cf_handle(self, dataset_name) -> rocksdb.ColumnFamily:
+        cf_name = self._validate_dataset(dataset_name)
+        # Access the CF handle using dictionary-like access
+        try:
+            return self.db.get_column_family_handle(cf_name)
+        except KeyError:
+            # This should ideally not happen if _known_column_families is correct and DB opened successfully
+            logger.error(f"Failed to get handle for Column Family '{cf_name}'. It might not have been opened correctly.")
+            raise
+
+    def get_cf(self, dataset_name) -> rocksdb.Rdict:
+        """
+        Gets the rocksdict handle for the specified dataset_name (Column Family).
+        Uses 'default' CF if dataset_name is None or not provided.
+        Raises an error if the dataset_name corresponds to a CF that wasn't opened.
+        """
+        cf_name = self._validate_dataset(dataset_name)
+        # Access the CF handle using dictionary-like access
+        try:
+            return self.db.get_column_family(cf_name)
+        except KeyError:
+             # This should ideally not happen if _known_column_families is correct and DB opened successfully
+             logger.error(f"Failed to get handle for Column Family '{cf_name}'. It might not have been opened correctly.")
+             raise
+
 
     @property
     def db(self):
         """
         Provides access to the underlying RocksDB instance.
         Returns None if the database is not open.
+        The returned object can be indexed by CF name to access specific CF handles.
+        e.g., db_instance['my_cf'].put(...)
         """
-        return self._db
+        db_instance = self._db
+        if db_instance is None:
+            raise RuntimeError("Database is not initialized. Cannot get CF handle.")
+        return db_instance
 
+    # Context management methods (__enter__ and __exit__) remain the same
     def __enter__(self):
         """Context management protocol entry: Opens the database."""
         self.open_db()
