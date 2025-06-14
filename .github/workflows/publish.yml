@@ -1,0 +1,57 @@
+# This workflow publishes the package to PyPI when a new version tag is pushed.
+
+name: Publish Python Package
+
+on:
+  push:
+    tags:
+      # Trigger on tags that look like version numbers, e.g., v0.1.0, v1.2.3a4
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+
+jobs:
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Ensure commands run within the kvwc subdirectory
+        working-directory: ./kvwc
+
+    # Grant necessary permissions for trusted publishing
+    permissions:
+      id-token: write # This is required for requesting the OIDC token for trusted publishing
+      contents: read # This is required for checking out the code
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Checkout the code into the GITHUB_WORKSPACE/kvwc directory
+          # to match the local structure and simplify paths.
+          path: kvwc
+          # Fetch tags as they are needed for the 'build' command to pick up the version
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "kvwc/.python-version" # Read Python version from .python-version file
+
+      - name: Install build dependencies
+        run: |
+          # Install build to create sdist and wheel packages
+          pip install build
+
+      - name: Build sdist and wheel
+        run: |
+          # Use the 'build' tool to create distributions in the dist/ directory
+          python -m build
+
+      - name: Publish package to PyPI
+        # Use the official PyPI publishing action that supports OIDC
+        uses: pypi/upload-package-action@v1
+        with:
+          packages_dir: kvwc/dist/ # The directory where the built packages are located
+          # The action automatically uses the OIDC token from the GitHub Actions environment
+          # when used with the correct permissions and configuration.
+          # No explicit API token is needed in the workflow file itself.
