@@ -28,10 +28,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Operating System :: OS Independent",                           # If truly OS independent, otherwise specify
 ]
-dependencies = [
-    "msgpack-python>=0.5.6",
-    "rocksdict",
-]
+dependencies = ["msgpack-python>=0.5.6", "rocksdict"]
 
 [project.urls]
 Homepage = "https://github.com/dzlab/kvwc"
@@ -41,3 +38,14 @@ BugTracker = "https://github.com/dzlab/kvwc/issues"
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.pyright]
+pythonVersion = "3.10"
+# Optional: Specify the path to the source code
+# include = ["src"]
+
+# Optional: Exclude files or directories from type checking
+# exclude = ["tests"]
+
+# Optional: Enable strict type checking
+# strict = false
